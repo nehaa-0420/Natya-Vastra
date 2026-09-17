@@ -44,7 +44,7 @@ const GALLERY_IMAGE_NUMS = Array.from({ length: 19 }, (_, i) => 37 + i); // 37..
 
 const path = (n) => `/assets/images/costume-${String(n).padStart(3, '0')}.jpg`;
 
-const run = db.transaction(() => {
+function run() {
   db.prepare('DELETE FROM category_images').run();
   db.prepare('DELETE FROM gallery_images').run();
   db.prepare('DELETE FROM categories').run();
@@ -65,8 +65,15 @@ const run = db.transaction(() => {
   }
 
   GALLERY_IMAGE_NUMS.forEach((num, i) => insertGalleryImage.run(path(num), i));
-});
+}
 
-run();
+db.exec('BEGIN');
+try {
+  run();
+  db.exec('COMMIT');
+} catch (err) {
+  db.exec('ROLLBACK');
+  throw err;
+}
 
 console.log(`Seeded ${CATEGORIES.length} categories and ${GALLERY_IMAGE_NUMS.length} gallery images.`);
