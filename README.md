@@ -8,7 +8,7 @@ WhatsApp-integrated order form, all backed by a real API and database.
 
 - **Frontend:** React + Vite (JSX components, plain CSS)
 - **Backend:** Node.js + Express
-- **Database:** SQLite (via `better-sqlite3`) — no separate DB server to install
+- **Database:** SQLite, via Node's built-in `node:sqlite` module — no separate DB server, and no native compiler needed (this needs **Node.js 22.5+**; check with `node --version`)
 
 ## Structure
 
