@@ -1,0 +1,8 @@
+.site-footer {
+  background: var(--maroon-deep);
+  color: var(--text-on-ink-muted);
+  text-align: center;
+  padding: 1.4rem 1rem;
+  font-size: 0.82rem;
+}
+.site-footer span { color: var(--gold-light); font-weight: 500; }

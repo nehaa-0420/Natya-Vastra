@@ -1,33 +1,82 @@
 # Natya Vastra
 
-Website for Natya Vastra, a classical Indian dance costume business — catalog galleries with a lightbox view, and WhatsApp-based ordering.
+Full-stack website for Natya Vastra — a Bengaluru-based Bharatanatyam costume
+atelier. Catalog galleries organized by costume type, a photo gallery, and a
+WhatsApp-integrated order form, all backed by a real API and database.
+
+## Stack
+
+- **Frontend:** React + Vite (JSX components, plain CSS)
+- **Backend:** Node.js + Express
+- **Database:** SQLite (via `better-sqlite3`) — no separate DB server to install
 
 ## Structure
 
 ```
 natya-vastra/
-├── index.html          # the whole site (HTML, CSS, JS in one file)
-└── assets/
-    └── images/          # costume photos, referenced by index.html
+├── client/     # React frontend
+│   ├── src/
+│   │   ├── components/   # Navbar, Hero, Collections, CategoryModal, Gallery, Contact, Footer
+│   │   ├── styles/       # one CSS file per component + global.css design tokens
+│   │   ├── api.js        # fetch wrapper for the backend
+│   │   └── App.jsx
+│   └── public/assets/images/   # costume photos
+└── server/     # Node/Express API
+    ├── db/
+    │   ├── schema.sql    # categories, category_images, gallery_images, enquiries
+    │   ├── seed.js        # populates the DB with the real catalog
+    │   └── index.js
+    ├── routes/
+    └── server.js
 ```
 
 ## Running it locally
 
-No build step — it's a static site. Either:
+You need two terminals — one for the API, one for the frontend.
 
-- Double-click `index.html` to open it directly in a browser, or
-- Serve it locally (recommended, avoids browser file:// restrictions):
-  ```bash
-  npx serve .
-  # or
-  python3 -m http.server 8000
-  ```
+**1. Backend**
+```bash
+cd server
+npm install
+cp .env.example .env
+npm run seed      # creates and fills the SQLite database (run once)
+npm run dev        # starts the API on http://localhost:4000
+```
 
-## Notes
+**2. Frontend**
+```bash
+cd client
+npm install
+npm run dev        # starts the site on http://localhost:5173
+```
 
-- Images used to be embedded as base64 directly in the HTML (this made the file over 5MB). They've been extracted into `assets/images/` and are now referenced by relative path — much easier to review changes to in git, and faster to load.
-- WhatsApp ordering number is set via the `WA_NUMBER` constant near the bottom of `index.html`.
+Open http://localhost:5173 — the site fetches categories, gallery images, and
+handles order enquiries from the API in `server/`.
+
+## How the data flows
+
+- **Collections** and the **gallery** are fetched from `GET /api/categories`
+  and `GET /api/gallery` — both read from the SQLite database, not hardcoded
+  arrays. To add or edit a costume category, edit `server/db/seed.js` and
+  re-run `npm run seed` (or, longer-term, build a small admin form that
+  writes to the `categories`/`category_images` tables directly).
+- **Order enquiries**: submitting the contact form saves the enquiry to the
+  `enquiries` table (so you have a permanent record) *and* opens WhatsApp
+  with the same details prefilled, since that's still the fastest way to
+  actually talk to a customer.
+
+## Deploying
+
+- **Frontend:** any static host (Vercel, Netlify, GitHub Pages) — run
+  `npm run build` in `client/` and deploy the `dist/` folder. Set
+  `VITE_API_BASE` to your deployed backend's URL before building.
+- **Backend:** any Node host (Render, Railway, a small VPS). Set `PORT` and
+  `CORS_ORIGIN` (your deployed frontend's URL) as environment variables.
+  SQLite's database file lives on disk, so on hosts with ephemeral
+  filesystems (like Render's free tier), back it up periodically or migrate
+  to a hosted database (e.g. Postgres) once you have real order volume.
 
 ## Planned next
 
-- A separate AI agent page, linked from the main site (scope still being finalized).
+- A separate AI agent page, linked from the main site (scope still being
+  finalized).

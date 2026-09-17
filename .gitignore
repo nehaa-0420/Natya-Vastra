@@ -1,5 +1,9 @@
-.DS_Store
-Thumbs.db
 node_modules/
 .env
 *.log
+dist/
+db/*.db
+db/*.db-shm
+db/*.db-wal
+.DS_Store
+Thumbs.db
