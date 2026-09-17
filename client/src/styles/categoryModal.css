@@ -34,6 +34,18 @@
   font-size: 1rem;
 }
 
+.cat-modal__header-inner .cat-modal__callout {
+  margin-top: 1.1rem;
+  padding: 0.85rem 1.1rem;
+  background: rgba(216, 174, 90, 0.12);
+  border: 1px solid rgba(216, 174, 90, 0.4);
+  border-radius: var(--radius);
+  color: var(--gold-light);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-width: 46ch;
+}
+
 .cat-modal__enquire {
   margin-top: 1.6rem;
 }
@@ -48,6 +60,7 @@
 }
 
 .cat-modal__thumb {
+  position: relative;
   border: none;
   padding: 0;
   border-radius: var(--radius);
@@ -62,6 +75,16 @@
   transition: transform 0.3s ease;
 }
 .cat-modal__thumb:hover img { transform: scale(1.05); }
+
+.cat-modal__thumb-label {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 0.4rem 0.55rem;
+  background: linear-gradient(180deg, transparent, rgba(28, 11, 16, 0.82));
+  color: var(--text-on-ink);
+  font-size: 0.76rem;
+  text-align: left;
+}
 
 @media (max-width: 720px) {
   .cat-modal__grid { grid-template-columns: repeat(2, 1fr); }

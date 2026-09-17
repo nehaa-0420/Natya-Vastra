@@ -5,11 +5,11 @@ const router = express.Router();
 
 function attachImages(categories) {
   const imageStmt = db.prepare(
-    'SELECT image_path FROM category_images WHERE category_id = ? ORDER BY sort_order'
+    'SELECT image_path, label FROM category_images WHERE category_id = ? ORDER BY sort_order'
   );
   return categories.map((cat) => ({
     ...cat,
-    images: imageStmt.all(cat.id).map((r) => r.image_path)
+    images: imageStmt.all(cat.id).map((r) => ({ src: r.image_path, label: r.label }))
   }));
 }
 

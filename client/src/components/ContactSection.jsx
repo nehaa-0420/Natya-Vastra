@@ -79,8 +79,9 @@ export default function ContactSection({ categories, presetCostume }) {
           </dl>
 
           <p className="contact__note">
-            All costumes are custom-stitched to your measurements. Delivery takes
-            3–4 weeks. Bulk orders for dance schools welcome.
+            We offer a wide range of Bharatanatyam and classical dance costumes
+            for rental and purchase. Let us know your size and the occasion,
+            and we'll help you find the right fit.
           </p>
         </div>
 

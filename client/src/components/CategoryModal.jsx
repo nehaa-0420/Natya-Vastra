@@ -18,6 +18,9 @@ export default function CategoryModal({ category, onClose, onEnquire }) {
           <button className="cat-modal__back" onClick={onClose}>&#8592; Back to collections</button>
           <h2>{category.name}</h2>
           <p>{category.description}</p>
+          {category.note && (
+            <p className="cat-modal__callout">{category.note}</p>
+          )}
           <button className="btn btn-gold cat-modal__enquire" onClick={() => onEnquire(category.name)}>
             Enquire about this collection
           </button>
@@ -25,15 +28,16 @@ export default function CategoryModal({ category, onClose, onEnquire }) {
       </div>
 
       <div className="container cat-modal__grid">
-        {category.images.map((src, i) => (
-          <button key={src} className="cat-modal__thumb" onClick={() => setLightboxIndex(i)}>
-            <img src={src} alt={`${category.name} ${i + 1}`} loading="lazy" />
+        {category.images.map((img, i) => (
+          <button key={img.src} className="cat-modal__thumb" onClick={() => setLightboxIndex(i)}>
+            <img src={img.src} alt={img.label || `${category.name} ${i + 1}`} loading="lazy" />
+            {img.label && <span className="cat-modal__thumb-label">{img.label}</span>}
           </button>
         ))}
       </div>
 
       <Lightbox
-        images={category.images}
+        images={category.images.map((img) => img.src)}
         index={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
         onNav={navLightbox}

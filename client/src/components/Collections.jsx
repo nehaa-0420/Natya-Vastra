@@ -5,8 +5,8 @@ export default function Collections({ categories, loading, error, onSelect }) {
     <section className="collections" id="collections">
       <div className="container">
         <div className="section-heading">
-          <h2>Collections, stitched to order</h2>
-          <p>Seven silhouettes, each cut and finished by hand — pick one to see it up close.</p>
+          <h2>Collections, ready to rent</h2>
+          <p>Seven collections to choose from, available for rent or purchase — pick one to see it up close.</p>
         </div>
 
         {loading && <p className="collections__status">Loading the collections…</p>}
@@ -25,7 +25,7 @@ export default function Collections({ categories, loading, error, onSelect }) {
                 style={{ '--accent': cat.accent_color }}
                 onClick={() => onSelect(cat)}
               >
-                <img src={cat.images[0]} alt={cat.name} loading="lazy" />
+                <img src={cat.images[0].src} alt={cat.name} loading="lazy" />
                 <span className="cat-card__scrim" />
                 <span className="cat-card__body">
                   <span className="cat-card__name">{cat.name}</span>

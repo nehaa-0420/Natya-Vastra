@@ -1,5 +1,10 @@
 // Populates categories, their images, and the general gallery.
 // Safe to re-run — it clears and re-inserts each time.
+//
+// Adding a caption to a photo (size, colour, etc.):
+//   Instead of a plain number, use a [number, "label text"] pair, e.g.
+//   images: [1, [2, 'Age 6-8 · Size 26'], 3]
+// Once you have the real size chart, replace the labels below.
 const db = require('./index');
 
 const CATEGORIES = [
@@ -11,6 +16,7 @@ const CATEGORIES = [
   {
     id: 'saree', name: 'Saree Sets', accent_color: '#1A2B4A', sort_order: 2,
     description: 'Elegant Bharatanatyam saree draping with zari borders.',
+    note: 'Practice sarees are available on a pre-order basis — get yours perfectly stitched and ready before class, or book ahead to avoid a last-minute rush.',
     images: [8, 9]
   },
   {
@@ -50,18 +56,21 @@ function run() {
   db.prepare('DELETE FROM categories').run();
 
   const insertCategory = db.prepare(
-    'INSERT INTO categories (id, name, description, accent_color, sort_order) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO categories (id, name, description, accent_color, sort_order, note) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const insertCategoryImage = db.prepare(
-    'INSERT INTO category_images (category_id, image_path, sort_order) VALUES (?, ?, ?)'
+    'INSERT INTO category_images (category_id, image_path, label, sort_order) VALUES (?, ?, ?, ?)'
   );
   const insertGalleryImage = db.prepare(
     'INSERT INTO gallery_images (image_path, sort_order) VALUES (?, ?)'
   );
 
   for (const cat of CATEGORIES) {
-    insertCategory.run(cat.id, cat.name, cat.description, cat.accent_color, cat.sort_order);
-    cat.images.forEach((num, i) => insertCategoryImage.run(cat.id, path(num), i));
+    insertCategory.run(cat.id, cat.name, cat.description, cat.accent_color, cat.sort_order, cat.note || null);
+    cat.images.forEach((entry, i) => {
+      const [num, label] = Array.isArray(entry) ? entry : [entry, null];
+      insertCategoryImage.run(cat.id, path(num), label, i);
+    });
   }
 
   GALLERY_IMAGE_NUMS.forEach((num, i) => insertGalleryImage.run(path(num), i));

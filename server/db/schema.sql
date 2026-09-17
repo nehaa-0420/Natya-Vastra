@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS categories (
   name         TEXT NOT NULL,
   description  TEXT NOT NULL,
   accent_color TEXT NOT NULL,
-  sort_order   INTEGER NOT NULL DEFAULT 0
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  note         TEXT  -- optional callout specific to this category (e.g. pre-order info)
 );
 
 -- Photos belonging to a category (one row per photo, ordered)
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS category_images (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   image_path  TEXT NOT NULL,
+  label       TEXT, -- optional caption shown on the photo (size, colour, etc.)
   sort_order  INTEGER NOT NULL DEFAULT 0
 );
 

@@ -11,8 +11,8 @@ export default function GallerySection({ images, loading, error }) {
     <section className="gallery-section" id="gallery">
       <div className="container">
         <div className="section-heading">
-          <h2>From the workshop floor</h2>
-          <p>A closer look at recent pieces, photographed before they left for the stage.</p>
+          <h2>From our collection</h2>
+          <p>A closer look at some of the costumes available right now.</p>
         </div>
 
         {loading && <p className="collections__status">Loading the gallery…</p>}

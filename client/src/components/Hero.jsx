@@ -7,11 +7,10 @@ export default function Hero() {
     <section className="hero" id="top">
       <div className="container hero__grid">
         <div className="hero__text">
-          <h1>Stitched for the stage, not the shelf.</h1>
+          <h1>Bharatanatyam Costumes for Rent</h1>
           <p className="hero__lede">
-            Every Natya Vastra costume is cut and finished by hand in our Bengaluru
-            workshop, to your measurements — from a first practice frock to an
-            arangetram set.
+            Elegant, traditional, and easy on the budget — perfect for
+            performances, exams, and every stage in between.
           </p>
           <div className="hero__actions">
             <a href="#collections" className="btn btn-primary">See the collections</a>
@@ -26,7 +25,7 @@ export default function Hero() {
           </div>
         </div>
         <div className="hero__figure">
-          <img src="/assets/images/costume-024.jpg" alt="A hand-finished six-piece Bharatanatyam costume" />
+          <img src="/assets/images/costume-024.jpg" alt="A six-piece Bharatanatyam costume available to rent" />
         </div>
       </div>
     </section>
