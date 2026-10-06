@@ -66,7 +66,7 @@ export default function ContactSection({ categories, presetCostume }) {
             </div>
             <div>
               <dt>Phone / WhatsApp</dt>
-              <dd>+91 99005 99872</dd>
+              <dd>+91 99027 23357 / +91 99005 99872</dd>
             </div>
             <div>
               <dt>Email</dt>
