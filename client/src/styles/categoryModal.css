@@ -82,8 +82,11 @@
   padding: 0.4rem 0.55rem;
   background: linear-gradient(180deg, transparent, rgba(28, 11, 16, 0.82));
   color: var(--text-on-ink);
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 @media (max-width: 720px) {

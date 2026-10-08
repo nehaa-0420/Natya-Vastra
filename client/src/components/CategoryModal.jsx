@@ -31,13 +31,19 @@ export default function CategoryModal({ category, onClose, onEnquire }) {
         {category.images.map((img, i) => (
           <button key={img.src} className="cat-modal__thumb" onClick={() => setLightboxIndex(i)}>
             <img src={img.src} alt={img.label || `${category.name} ${i + 1}`} loading="lazy" />
-            {img.label && <span className="cat-modal__thumb-label">{img.label}</span>}
+            {(img.label || img.sizeMin) && (
+              <span className="cat-modal__thumb-label">
+                {img.label && <span>{img.label}</span>}
+                {img.sizeMin && <span>Sizes {img.sizeMin}–{img.sizeMax} in</span>}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       <Lightbox
         images={category.images.map((img) => img.src)}
+        details={category.images}
         index={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
         onNav={navLightbox}

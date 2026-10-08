@@ -13,7 +13,11 @@ CREATE TABLE IF NOT EXISTS category_images (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   image_path  TEXT NOT NULL,
-  label       TEXT, -- optional caption shown on the photo (size, colour, etc.)
+  label       TEXT, -- optional caption shown on the photo (colour name, etc.)
+  size_min    INTEGER, -- smallest size in stock (inches)
+  size_max    INTEGER, -- largest size in stock (inches)
+  total       INTEGER, -- total pieces of this costume
+  sizes_json  TEXT,    -- per-size stock, e.g. [{"size":32,"count":2}]
   sort_order  INTEGER NOT NULL DEFAULT 0
 );
 

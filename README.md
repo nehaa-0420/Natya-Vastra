@@ -80,3 +80,10 @@ handles order enquiries from the API in `server/`.
 
 - A separate AI agent page, linked from the main site (scope still being
   finalized).
+
+## Updating sizes and stock
+
+Size ranges and per-size stock for each costume photo live in
+`server/db/sizes.json` (keyed by photo number, e.g. `"7"` = `costume-007.jpg`).
+Edit the numbers there, then run `npm run seed` in `server/` and restart the API.
+The data was taken from the Chiguru Costumes PDF menu.

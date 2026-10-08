@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import '../styles/lightbox.css';
 
-export default function Lightbox({ images, index, onClose, onNav }) {
+export default function Lightbox({ images, details, index, onClose, onNav }) {
   const open = index !== null && index !== undefined;
 
   useEffect(() => {
@@ -26,11 +26,10 @@ export default function Lightbox({ images, index, onClose, onNav }) {
         aria-label="Previous photo"
       >&#8249;</button>
 
-      <img
-        src={images[index]}
-        alt=""
-        onClick={(e) => e.stopPropagation()}
-      />
+      <div className="lightbox__stage" onClick={(e) => e.stopPropagation()}>
+        <img src={images[index]} alt="" />
+        <SizePanel info={details && details[index]} />
+      </div>
 
       <button
         className="lightbox__nav lightbox__nav--next"
@@ -39,6 +38,27 @@ export default function Lightbox({ images, index, onClose, onNav }) {
       >&#8250;</button>
 
       <div className="lightbox__counter">{index + 1} / {images.length}</div>
+    </div>
+  );
+}
+
+function SizePanel({ info }) {
+  if (!info || !info.sizeMin) return null;
+  return (
+    <div className="size-panel">
+      <p className="size-panel__title">
+        Sizes {info.sizeMin}–{info.sizeMax} inches{info.total ? ` · ${info.total} pieces in total` : ''}
+      </p>
+      {info.sizes && info.sizes.length > 0 ? (
+        <ul className="size-panel__list">
+          {info.sizes.map((s) => (
+            <li key={s.size}><strong>{s.size}</strong><span>{s.count} available</span></li>
+          ))}
+        </ul>
+      ) : (
+        <p className="size-panel__note">Ask us on WhatsApp for the count in each size.</p>
+      )}
+      <p className="size-panel__note">Stock changes as costumes go out on rent — please confirm availability with us.</p>
     </div>
   );
 }

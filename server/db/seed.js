@@ -5,7 +5,13 @@
 //   Instead of a plain number, use a [number, "label text"] pair, e.g.
 //   images: [1, [2, 'Age 6-8 · Size 26'], 3]
 // Once you have the real size chart, replace the labels below.
+const fs = require('fs');
+const nodePath = require('path');
 const db = require('./index');
+
+// Size/stock data taken from the Chiguru Costumes PDF menu (see sizes.json).
+// Keys are the costume photo numbers; edit sizes.json when stock changes.
+const SIZES = JSON.parse(fs.readFileSync(nodePath.join(__dirname, 'sizes.json'), 'utf8'));
 
 const CATEGORIES = [
   {
@@ -59,7 +65,7 @@ function run() {
     'INSERT INTO categories (id, name, description, accent_color, sort_order, note) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const insertCategoryImage = db.prepare(
-    'INSERT INTO category_images (category_id, image_path, label, sort_order) VALUES (?, ?, ?, ?)'
+    'INSERT INTO category_images (category_id, image_path, label, size_min, size_max, total, sizes_json, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const insertGalleryImage = db.prepare(
     'INSERT INTO gallery_images (image_path, sort_order) VALUES (?, ?)'
@@ -69,7 +75,15 @@ function run() {
     insertCategory.run(cat.id, cat.name, cat.description, cat.accent_color, cat.sort_order, cat.note || null);
     cat.images.forEach((entry, i) => {
       const [num, label] = Array.isArray(entry) ? entry : [entry, null];
-      insertCategoryImage.run(cat.id, path(num), label, i);
+      const sz = SIZES[String(num)];
+      insertCategoryImage.run(
+        cat.id, path(num), label,
+        sz ? sz.sizeRange[0] : null,
+        sz ? sz.sizeRange[1] : null,
+        sz ? sz.total : null,
+        sz && sz.sizes.length ? JSON.stringify(sz.sizes) : null,
+        i
+      );
     });
   }
 
