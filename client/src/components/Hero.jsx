@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import '../styles/hero.css';
 
 const WA_NUMBER = '919900599872';
@@ -13,7 +14,7 @@ export default function Hero() {
             performances, exams, and every stage in between.
           </p>
           <div className="hero__actions">
-            <a href="#collections" className="btn btn-primary">See the collections</a>
+            <Link to="/browse" className="btn btn-primary">Browse &amp; book online</Link>
             <a
               href={`https://wa.me/${WA_NUMBER}`}
               target="_blank"

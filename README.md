@@ -1,89 +1,101 @@
-# Natya Vastra
+# Natya Vastra — costume rental platform
 
-Full-stack website for Natya Vastra — a Bengaluru-based Bharatanatyam costume
-atelier. Catalog galleries organized by costume type, a photo gallery, and a
-WhatsApp-integrated order form, all backed by a real API and database.
+Full-stack website for **Natya Vastra / Chiguru Costumes**, a Bengaluru costume
+rental and purchase business: customers browse real stock by size and date, book a
+costume online, and the shop manages everything from an admin dashboard.
 
-## Stack
+## Features
 
-- **Frontend:** React + Vite (JSX components, plain CSS)
-- **Backend:** Node.js + Express
-- **Database:** SQLite, via Node's built-in `node:sqlite` module — no separate DB server, and no native compiler needed (this needs **Node.js 22.5+**; check with `node --version`)
+| Area | What it does |
+|------|--------------|
+| **Catalog** | 36 costumes in 7 categories with real size ranges and per-size stock taken from the shop's PDF menu |
+| **Search & filters** | Text search, category, size, and *date availability* ("show me what is free 19–21 Oct in size 36") |
+| **Booking engine** | Pick size and dates; stock is checked per day so overlapping bookings can't oversell a costume |
+| **Accounts** | Sign up / log in (JWT), wishlist (♥), "My bookings" with cancel |
+| **Admin dashboard** | Confirm / cancel / mark bookings returned, add costumes with photo upload, edit prices and stock per size, hide costumes, read enquiries |
+| **WhatsApp** | Order form and booking confirmations hand off to WhatsApp; admin can open a customer chat in one click |
 
-## Structure
+## Tech stack
+
+- **Frontend:** React 18 + Vite, React Router, plain CSS
+- **Backend:** Node.js + Express (REST API)
+- **Database:** SQLite through Node's built-in `node:sqlite` (needs **Node 22.5+**; no native build tools)
+- **Security:** scrypt password hashing, JWT auth with role checks, rate-limited login, upload type/size limits, parameterised SQL
+- **Tests:** Node's built-in test runner (21 tests: booking logic, seed data, auth, permissions, uploads)
+
+## Project structure
 
 ```
-natya-vastra/
-├── client/     # React frontend
-│   ├── src/
-│   │   ├── components/   # Navbar, Hero, Collections, CategoryModal, Gallery, Contact, Footer
-│   │   ├── styles/       # one CSS file per component + global.css design tokens
-│   │   ├── api.js        # fetch wrapper for the backend
-│   │   └── App.jsx
-│   └── public/assets/images/   # costume photos
-└── server/     # Node/Express API
-    ├── db/
-    │   ├── schema.sql    # categories, category_images, gallery_images, enquiries
-    │   ├── seed.js        # populates the DB with the real catalog
-    │   └── index.js
-    ├── routes/
-    └── server.js
+client/                 React app
+  src/pages/            Home, Browse, Costume (booking), Auth, Account, Admin
+  src/components/       Navbar, CostumeCard, Lightbox, ...
+  src/context/          AuthContext (login state + wishlist)
+  src/api.js            every call to the backend
+server/
+  app.js, server.js     Express app / entry point
+  db/                   schema.sql, seed.js, sizes.json (stock from the PDF)
+  lib/availability.js   the booking engine
+  routes/               auth, costumes, bookings, wishlist, admin, ...
+  test/                 automated tests
 ```
 
 ## Running it locally
 
-You need two terminals — one for the API, one for the frontend.
+Two terminals.
 
-**1. Backend**
 ```bash
+# 1) API
 cd server
 npm install
-cp .env.example .env
-npm run seed      # creates and fills the SQLite database (run once)
-npm run dev        # starts the API on http://localhost:4000
-```
+cp .env.example .env      # on Windows: copy .env.example .env
+npm run dev               # first start loads the catalog and creates the admin account
 
-**2. Frontend**
-```bash
+# 2) website
 cd client
 npm install
-npm run dev        # starts the site on http://localhost:5173
+npm run dev               # http://localhost:5173
 ```
 
-Open http://localhost:5173 — the site fetches categories, gallery images, and
-handles order enquiries from the API in `server/`.
+**Admin login:** the email and password from `server/.env` (`ADMIN_EMAIL`, `ADMIN_PASSWORD`;
+defaults `admin@natyavastra.local` / `ChangeMe123!`). Change them before going live — the
+admin account is created once, the first time the server starts on an empty database.
 
-## How the data flows
+> **Upgrading from an older version of this project?** The database layout changed.
+> Delete `server/db/natya_vastra.db*` once and start the server again.
 
-- **Collections** and the **gallery** are fetched from `GET /api/categories`
-  and `GET /api/gallery` — both read from the SQLite database, not hardcoded
-  arrays. To add or edit a costume category, edit `server/db/seed.js` and
-  re-run `npm run seed` (or, longer-term, build a small admin form that
-  writes to the `categories`/`category_images` tables directly).
-- **Order enquiries**: submitting the contact form saves the enquiry to the
-  `enquiries` table (so you have a permanent record) *and* opens WhatsApp
-  with the same details prefilled, since that's still the fastest way to
-  actually talk to a customer.
+### Tests
 
-## Deploying
+```bash
+cd server && npm test
+```
 
-- **Frontend:** any static host (Vercel, Netlify, GitHub Pages) — run
-  `npm run build` in `client/` and deploy the `dist/` folder. Set
-  `VITE_API_BASE` to your deployed backend's URL before building.
-- **Backend:** any Node host (Render, Railway, a small VPS). Set `PORT` and
-  `CORS_ORIGIN` (your deployed frontend's URL) as environment variables.
-  SQLite's database file lives on disk, so on hosts with ephemeral
-  filesystems (like Render's free tier), back it up periodically or migrate
-  to a hosted database (e.g. Postgres) once you have real order volume.
+## How booking availability works
 
-## Planned next
+Each costume has stock per size (`costume_stock`). A booking covers whole days, both ends
+inclusive. For a requested range the engine looks at **each day** and counts how many pending or
+confirmed bookings cover it; the busiest day decides how many pieces are left. So a booking for
+1–3 Oct and another for 4–6 Oct don't block a third for 2–5 Oct when two pieces exist. Costumes
+for which the PDF only gives a total (the kids' sizes) use *pooled* stock: any size within the
+range, counted together. Saree sets and the Devi costume have no stock data, so they are
+"enquire on WhatsApp" instead of bookable. Booking runs inside a locked transaction so two people
+can't take the last piece at the same moment.
 
-- A separate AI agent page, linked from the main site (scope still being
-  finalized).
+## Updating stock and prices
 
-## Updating sizes and stock
+Use **Admin → Costumes & stock**. Rent prices are blank (shown as "price on request") until you
+enter them. `server/db/sizes.json` only seeds the *first* load; after that the admin dashboard is
+the source of truth. Re-seeding (`npm run seed`) refuses to run if bookings exist; `--force` wipes them.
 
-Size ranges and per-size stock for each costume photo live in
-`server/db/sizes.json` (keyed by photo number, e.g. `"7"` = `costume-007.jpg`).
-Edit the numbers there, then run `npm run seed` in `server/` and restart the API.
-The data was taken from the Chiguru Costumes PDF menu.
+## API overview
+
+Public: `GET /api/categories`, `/api/costumes?q&category&size&from&to`, `/api/costumes/:id`,
+`/api/costumes/:id/availability?start&end`, `POST /api/enquiries`, `POST /api/auth/register|login`.
+Logged in: `POST /api/bookings`, `GET /api/bookings/mine`, `POST /api/bookings/:id/cancel`, `/api/wishlist`.
+Admin only: `/api/admin/stats|bookings|costumes|enquiries`.
+
+## Roadmap
+
+- Razorpay deposit payment
+- AI costume assistant page
+- Email / WhatsApp booking confirmations
+- Deployment (hosted site + database backups)

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import '../styles/lightbox.css';
 
 export default function Lightbox({ images, details, index, onClose, onNav }) {
@@ -46,6 +47,7 @@ function SizePanel({ info }) {
   if (!info || !info.sizeMin) return null;
   return (
     <div className="size-panel">
+      {info.id && <Link to={`/costumes/${info.id}`} className="btn btn-gold size-panel__book">{info.bookable ? 'Check dates & book' : 'View details'}</Link>}
       <p className="size-panel__title">
         Sizes {info.sizeMin}–{info.sizeMax} inches{info.total ? ` · ${info.total} pieces in total` : ''}
       </p>

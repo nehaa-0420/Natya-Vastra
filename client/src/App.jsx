@@ -1,64 +1,30 @@
-import { useEffect, useState } from 'react';
-import { getCategories, getGallery } from './api.js';
+import { Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
-import Hero from './components/Hero.jsx';
-import Collections from './components/Collections.jsx';
-import CategoryModal from './components/CategoryModal.jsx';
-import GallerySection from './components/GallerySection.jsx';
-import ContactSection from './components/ContactSection.jsx';
 import Footer from './components/Footer.jsx';
+import ScrollManager from './components/ScrollManager.jsx';
+import HomePage from './pages/HomePage.jsx';
+import BrowsePage from './pages/BrowsePage.jsx';
+import CostumePage from './pages/CostumePage.jsx';
+import AuthPage from './pages/AuthPage.jsx';
+import AccountPage from './pages/AccountPage.jsx';
+import AdminPage from './pages/AdminPage.jsx';
 
 export default function App() {
-  const [categories, setCategories] = useState([]);
-  const [catLoading, setCatLoading] = useState(true);
-  const [catError, setCatError] = useState(null);
-
-  const [gallery, setGallery] = useState([]);
-  const [galleryLoading, setGalleryLoading] = useState(true);
-  const [galleryError, setGalleryError] = useState(null);
-
-  const [activeCategory, setActiveCategory] = useState(null);
-  const [presetCostume, setPresetCostume] = useState('');
-
-  useEffect(() => {
-    getCategories()
-      .then(setCategories)
-      .catch((err) => setCatError(err.message))
-      .finally(() => setCatLoading(false));
-
-    getGallery()
-      .then(setGallery)
-      .catch((err) => setGalleryError(err.message))
-      .finally(() => setGalleryLoading(false));
-  }, []);
-
-  const handleEnquire = (categoryName) => {
-    setActiveCategory(null);
-    setPresetCostume(categoryName);
-    setTimeout(() => {
-      document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
-  };
-
   return (
     <>
+      <ScrollManager />
       <Navbar />
-      <Hero />
-      <Collections
-        categories={categories}
-        loading={catLoading}
-        error={catError}
-        onSelect={setActiveCategory}
-      />
-      <GallerySection images={gallery} loading={galleryLoading} error={galleryError} />
-      <ContactSection categories={categories} presetCostume={presetCostume} />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/browse" element={<BrowsePage />} />
+        <Route path="/costumes/:id" element={<CostumePage />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/register" element={<AuthPage mode="register" />} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="*" element={<main className="page"><div className="container"><h1 className="page-title">Page not found</h1><p><a href="/">Back to the home page</a></p></div></main>} />
+      </Routes>
       <Footer />
-
-      <CategoryModal
-        category={activeCategory}
-        onClose={() => setActiveCategory(null)}
-        onEnquire={handleEnquire}
-      />
     </>
   );
 }

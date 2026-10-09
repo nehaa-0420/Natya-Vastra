@@ -58,3 +58,23 @@
   .navbar__mark { font-size: 1.5rem; }
   .navbar__links { gap: 1.1rem; font-size: 0.92rem; }
 }
+
+.navbar__link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(243, 233, 216, 0.88);
+  font-size: inherit;
+  font-weight: 500;
+}
+.navbar__link-btn:hover { color: var(--text-on-ink); }
+
+@media (max-width: 860px) {
+  .navbar__opt { display: none; }
+}
+
+@media (max-width: 560px) {
+  .navbar__mark { font-size: 1.3rem; }
+  .navbar__links { gap: 0.8rem; font-size: 0.86rem; }
+  .navbar__cta { padding: 0.4rem 0.7rem; }
+}

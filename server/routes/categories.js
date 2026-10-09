@@ -1,36 +1,28 @@
 const express = require('express');
 const db = require('../db');
+const { stockMap, serializeCostume, COSTUME_SELECT } = require('../lib/serialize');
 
 const router = express.Router();
 
-function attachImages(categories) {
-  const imageStmt = db.prepare(
-    'SELECT image_path, label, size_min, size_max, total, sizes_json FROM category_images WHERE category_id = ? ORDER BY sort_order'
-  );
+// Each category comes with its active costumes (as `images`, which the home page already uses).
+function withCostumes(categories) {
+  const stocks = stockMap(db);
+  const stmt = db.prepare(`${COSTUME_SELECT} WHERE c.category_id = ? AND c.active = 1 ORDER BY c.sort_order, c.id`);
   return categories.map((cat) => ({
     ...cat,
-    images: imageStmt.all(cat.id).map((r) => ({
-      src: r.image_path,
-      label: r.label,
-      sizeMin: r.size_min,
-      sizeMax: r.size_max,
-      total: r.total,
-      sizes: r.sizes_json ? JSON.parse(r.sizes_json) : []
-    }))
+    images: stmt.all(cat.id).map((row) => serializeCostume(row, stocks.get(row.id) || []))
   }));
 }
 
-// GET /api/categories — all categories with their images
 router.get('/', (req, res) => {
   const categories = db.prepare('SELECT * FROM categories ORDER BY sort_order').all();
-  res.json(attachImages(categories));
+  res.json(withCostumes(categories));
 });
 
-// GET /api/categories/:id — one category with its images
 router.get('/:id', (req, res) => {
   const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
   if (!category) return res.status(404).json({ error: 'Category not found.' });
-  res.json(attachImages([category])[0]);
+  res.json(withCostumes([category])[0]);
 });
 
 module.exports = router;

@@ -1,35 +1,26 @@
 const express = require('express');
 const db = require('../db');
+const { rateLimit } = require('../middleware/rateLimit');
 
 const router = express.Router();
+const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20 });
 
-const insertEnquiry = db.prepare(`
-  INSERT INTO enquiries (name, phone, email, costume_type, message)
-  VALUES (@name, @phone, @email, @costume_type, @message)
-`);
-
-// POST /api/enquiries — record an order enquiry from the contact form
-router.post('/', (req, res) => {
+// Public: anyone can send an enquiry. Reading them is admin-only (see routes/admin.js).
+router.post('/', limiter, (req, res) => {
   const { name, phone, email, costume_type, message } = req.body;
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name is required.' });
+  if (!phone || !String(phone).trim()) return res.status(400).json({ error: 'Phone number is required.' });
 
-  if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required.' });
-  if (!phone || !phone.trim()) return res.status(400).json({ error: 'Phone number is required.' });
-
-  const result = insertEnquiry.run({
-    name: name.trim(),
-    phone: phone.trim(),
-    email: (email || '').trim(),
-    costume_type: costume_type || '',
-    message: (message || '').trim()
-  });
-
-  res.status(201).json({ id: result.lastInsertRowid, saved: true });
-});
-
-// GET /api/enquiries — list saved enquiries (for the shop owner to review)
-router.get('/', (req, res) => {
-  const rows = db.prepare('SELECT * FROM enquiries ORDER BY created_at DESC').all();
-  res.json(rows);
+  const result = db.prepare(
+    'INSERT INTO enquiries (name, phone, email, costume_type, message) VALUES (?, ?, ?, ?, ?)'
+  ).run(
+    String(name).trim().slice(0, 80),
+    String(phone).trim().slice(0, 20),
+    String(email || '').trim().slice(0, 120),
+    String(costume_type || '').slice(0, 80),
+    String(message || '').trim().slice(0, 1000)
+  );
+  res.status(201).json({ id: Number(result.lastInsertRowid), saved: true });
 });
 
 module.exports = router;

@@ -5,30 +5,37 @@ CREATE TABLE IF NOT EXISTS categories (
   description  TEXT NOT NULL,
   accent_color TEXT NOT NULL,
   sort_order   INTEGER NOT NULL DEFAULT 0,
-  note         TEXT  -- optional callout specific to this category (e.g. pre-order info)
+  note         TEXT
 );
 
--- Photos belonging to a category (one row per photo, ordered)
-CREATE TABLE IF NOT EXISTS category_images (
+-- One row per costume design (one photo = one design in the PDF menu)
+CREATE TABLE IF NOT EXISTS costumes (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   image_path  TEXT NOT NULL,
-  label       TEXT, -- optional caption shown on the photo (colour name, etc.)
-  size_min    INTEGER, -- smallest size in stock (inches)
-  size_max    INTEGER, -- largest size in stock (inches)
-  total       INTEGER, -- total pieces of this costume
-  sizes_json  TEXT,    -- per-size stock, e.g. [{"size":32,"count":2}]
+  name        TEXT,
+  label       TEXT,
+  rent_price  INTEGER,           -- rupees per day; NULL = price on request
+  size_min    INTEGER,
+  size_max    INTEGER,
+  active      INTEGER NOT NULL DEFAULT 1,
   sort_order  INTEGER NOT NULL DEFAULT 0
 );
 
--- Standalone "our work" gallery, not tied to a specific category
+-- Stock per size. size 0 means "pooled": any size inside [size_min, size_max]
+CREATE TABLE IF NOT EXISTS costume_stock (
+  costume_id INTEGER NOT NULL REFERENCES costumes(id) ON DELETE CASCADE,
+  size       INTEGER NOT NULL,
+  qty        INTEGER NOT NULL CHECK (qty >= 0),
+  PRIMARY KEY (costume_id, size)
+);
+
 CREATE TABLE IF NOT EXISTS gallery_images (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   image_path TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 
--- Customer enquiries submitted through the contact form
 CREATE TABLE IF NOT EXISTS enquiries (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   name         TEXT NOT NULL,
@@ -39,4 +46,36 @@ CREATE TABLE IF NOT EXISTS enquiries (
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_category_images_category ON category_images(category_id);
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  name          TEXT NOT NULL,
+  email         TEXT NOT NULL UNIQUE,
+  phone         TEXT,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin')),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS wishlist (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  costume_id INTEGER NOT NULL REFERENCES costumes(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, costume_id)
+);
+
+CREATE TABLE IF NOT EXISTS bookings (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  costume_id  INTEGER NOT NULL REFERENCES costumes(id),
+  size        INTEGER NOT NULL,
+  start_date  TEXT NOT NULL,      -- YYYY-MM-DD, inclusive
+  end_date    TEXT NOT NULL,      -- YYYY-MM-DD, inclusive
+  status      TEXT NOT NULL DEFAULT 'pending'
+              CHECK (status IN ('pending','confirmed','cancelled','returned')),
+  notes       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_costumes_category ON costumes(category_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_costume ON bookings(costume_id, status);
+CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
