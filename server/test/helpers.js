@@ -12,10 +12,10 @@ function makeCategory(id = 'test') {
   db.prepare("INSERT OR IGNORE INTO categories (id, name, description, accent_color, sort_order) VALUES (?, 'Test', 'd', '#000', 1)").run(id);
   return id;
 }
-function makeCostume({ stock = [{ size: 36, qty: 1 }], sizeMin = null, sizeMax = null, category = 'test' } = {}) {
+function makeCostume({ stock = [{ size: 36, qty: 1 }], sizeMin = null, sizeMax = null, category = 'test', rentPrice = null } = {}) {
   makeCategory(category);
-  const r = db.prepare('INSERT INTO costumes (category_id, image_path, size_min, size_max) VALUES (?, ?, ?, ?)')
-    .run(category, '/assets/images/x.jpg', sizeMin, sizeMax);
+  const r = db.prepare('INSERT INTO costumes (category_id, image_path, size_min, size_max, rent_price) VALUES (?, ?, ?, ?, ?)')
+    .run(category, '/assets/images/x.jpg', sizeMin, sizeMax, rentPrice);
   for (const s of stock) db.prepare('INSERT INTO costume_stock (costume_id, size, qty) VALUES (?, ?, ?)').run(r.lastInsertRowid, s.size, s.qty);
   return Number(r.lastInsertRowid);
 }

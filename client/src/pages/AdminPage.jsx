@@ -83,7 +83,7 @@ function BookingsTab({ onChange }) {
       {rows === null ? <p>Loading…</p> : rows.length === 0 ? <p className="empty">No bookings here yet.</p> : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Costume</th><th>Customer</th><th>Size</th><th>Dates</th><th>Status</th></tr></thead>
+            <thead><tr><th>Costume</th><th>Customer</th><th>Size</th><th>Dates</th><th>Deposit</th><th>Status</th></tr></thead>
             <tbody>
               {rows.map((b) => (
                 <tr key={b.id}>
@@ -92,6 +92,13 @@ function BookingsTab({ onChange }) {
                     {b.user.phone && <small><a href={waLink(b.user.phone)} target="_blank" rel="noreferrer">{b.user.phone} · WhatsApp</a></small>}</td>
                   <td>{b.size}</td>
                   <td>{b.startDate} → {b.endDate}<small>{b.days} day{b.days > 1 ? 's' : ''}{b.notes ? ` · “${b.notes}”` : ''}</small></td>
+                  <td>
+                    {b.depositStatus === 'paid' && <span className="badge badge--ok" style={{background:'#d8ebd9',color:'#1d4d24'}}>paid</span>}
+                    {b.depositStatus === 'awaiting' && <span className="badge badge--pending">awaiting</span>}
+                    {b.depositStatus === 'failed' && <span className="badge badge--cancelled">failed</span>}
+                    {b.depositStatus === 'not_required' && <span className="badge" style={{opacity:0.5}}>n/a</span>}
+                    {b.depositAmount ? <small>&#8377;{b.depositAmount}</small> : null}
+                  </td>
                   <td>
                     <select aria-label={`Status of booking ${b.id}`} className={`status-select badge--${b.status}`} value={b.status} onChange={(e) => change(b, e.target.value)}>
                       {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}

@@ -63,3 +63,9 @@ export const adminCostumes = () => request('/api/admin/costumes');
 export const adminCreateCostume = (form) => request('/api/admin/costumes', { method: 'POST', form });
 export const adminUpdateCostume = (id, body) => request(`/api/admin/costumes/${id}`, { method: 'PUT', body });
 export const adminEnquiries = () => request('/api/admin/enquiries');
+
+// payments (Razorpay)
+export const createPaymentOrder = (bookingId) => request('/api/payments/orders', { method: 'POST', body: { bookingId } });
+export const verifyPayment = (body) => request('/api/payments/verify', { method: 'POST', body });
+export const failPayment = (orderId) => request(`/api/payments/${orderId}/fail`, { method: 'POST' });
+

@@ -64,16 +64,30 @@ CREATE TABLE IF NOT EXISTS wishlist (
 );
 
 CREATE TABLE IF NOT EXISTS bookings (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  costume_id  INTEGER NOT NULL REFERENCES costumes(id),
-  size        INTEGER NOT NULL,
-  start_date  TEXT NOT NULL,      -- YYYY-MM-DD, inclusive
-  end_date    TEXT NOT NULL,      -- YYYY-MM-DD, inclusive
-  status      TEXT NOT NULL DEFAULT 'pending'
-              CHECK (status IN ('pending','confirmed','cancelled','returned')),
-  notes       TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  costume_id     INTEGER NOT NULL REFERENCES costumes(id),
+  size           INTEGER NOT NULL,
+  start_date     TEXT NOT NULL,      -- YYYY-MM-DD, inclusive
+  end_date       TEXT NOT NULL,      -- YYYY-MM-DD, inclusive
+  status         TEXT NOT NULL DEFAULT 'pending'
+                 CHECK (status IN ('pending','confirmed','cancelled','returned')),
+  deposit_status TEXT NOT NULL DEFAULT 'not_required'
+                 CHECK (deposit_status IN ('not_required','awaiting','paid','failed')),
+  notes          TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Razorpay payment records linked to a booking (one per attempt).
+CREATE TABLE IF NOT EXISTS payments (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id         INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  razorpay_order_id  TEXT NOT NULL UNIQUE,
+  razorpay_payment_id TEXT,          -- filled in after successful capture
+  amount_paise       INTEGER NOT NULL, -- deposit in paise (1 INR = 100 paise)
+  status             TEXT NOT NULL DEFAULT 'created'
+                     CHECK (status IN ('created','paid','failed')),
+  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_costumes_category ON costumes(category_id);

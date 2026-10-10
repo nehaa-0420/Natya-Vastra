@@ -69,6 +69,7 @@
 .avail--no { color: #9b1c2c; }
 .estimate { font-size: 0.95rem; }
 .estimate span { color: var(--text-muted); font-size: 0.82rem; }
+.panel-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 
 /* ---------- login / register ---------- */
 .auth-card { max-width: 440px; margin: 0 auto; background: #fffaf0; border: 1px solid rgba(110, 91, 79, 0.25); border-radius: var(--radius); padding: clamp(1.4rem, 4vw, 2.2rem); display: flex; flex-direction: column; gap: 1rem; }

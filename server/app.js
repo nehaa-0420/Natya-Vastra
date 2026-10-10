@@ -22,6 +22,7 @@ app.use('/api/costumes', require('./routes/costumes'));
 app.use('/api/gallery', require('./routes/gallery'));
 app.use('/api/enquiries', require('./routes/enquiries'));
 app.use('/api/bookings', require('./routes/bookings'));
+app.use('/api/payments', require('./routes/payments'));
 app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/admin', require('./routes/admin'));
 

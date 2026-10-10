@@ -1,9 +1,9 @@
-node_modules/
-.env
 *.log
-dist/
+.DS_Store
+.env
+Thumbs.db
 db/*.db
 db/*.db-shm
 db/*.db-wal
-.DS_Store
-Thumbs.db
+dist/
+node_modules/

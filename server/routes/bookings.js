@@ -24,8 +24,11 @@ function serializeBooking(r) {
     endDate: r.end_date,
     days,
     status: r.status,
+    depositStatus: r.deposit_status,
+    rentPrice: r.rent_price,
     notes: r.notes,
     estimatedTotal: r.rent_price ? r.rent_price * days : null,
+    depositAmount: r.rent_price ? Math.ceil((r.rent_price * days) / 2) : null,
     createdAt: r.created_at,
     ...(r.user_name !== undefined && { user: { name: r.user_name, email: r.user_email, phone: r.user_phone } })
   };

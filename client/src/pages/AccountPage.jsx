@@ -47,32 +47,51 @@ export default function AccountPage() {
 
         {tab === 'bookings' && (
           bookings === null ? <p>Loading…</p> :
-          bookings.length === 0 ? <p className="empty">You have no bookings yet. <Link to="/browse">Browse costumes</Link> and pick your dates.</p> :
-          <ul className="booking-list">
-            {bookings.map((b) => (
-              <li key={b.id} className="booking">
-                <img src={assetUrl(b.src)} alt="" />
-                <div className="booking__main">
-                  <h3><Link to={`/costumes/${b.costumeId}`}>{b.costumeName}</Link></h3>
-                  <p>Size {b.size} · {b.startDate} to {b.endDate} ({b.days} day{b.days > 1 ? 's' : ''})</p>
-                  {b.estimatedTotal && <p>Estimated ₹{b.estimatedTotal}</p>}
-                  {b.notes && <p className="booking__notes">“{b.notes}”</p>}
-                </div>
-                <div className="booking__side">
-                  <span className={`badge badge--${b.status}`}>{b.status}</span>
-                  {['pending', 'confirmed'].includes(b.status) && b.startDate >= todayLocal() && (
-                    <button className="link-btn" onClick={() => cancel(b)}>Cancel</button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+          bookings.length === 0
+            ? <p className="empty">You have no bookings yet. <Link to="/browse">Browse costumes</Link> and pick your dates.</p>
+            : (
+              <ul className="booking-list">
+                {bookings.map((b) => (
+                  <li key={b.id} className="booking">
+                    <img src={assetUrl(b.src)} alt="" />
+                    <div className="booking__main">
+                      <h3><Link to={`/costumes/${b.costumeId}`}>{b.costumeName}</Link></h3>
+                      <p>Size {b.size} &middot; {b.startDate} to {b.endDate} ({b.days} day{b.days > 1 ? 's' : ''})</p>
+                      {b.estimatedTotal && <p>Estimated &#8377;{b.estimatedTotal}</p>}
+                      {b.depositStatus === 'paid' && b.depositAmount && (
+                        <p style={{ color: '#1d6b2b', fontSize: '0.88rem' }}>&#10003; Deposit &#8377;{b.depositAmount} paid</p>
+                      )}
+                      {b.depositStatus === 'awaiting' && (
+                        <p style={{ color: '#6b4a00', fontSize: '0.88rem' }}>
+                          &#9203; Deposit pending &mdash;{' '}
+                          <Link to={`/costumes/${b.costumeId}`}>pay now</Link>
+                        </p>
+                      )}
+                      {b.depositStatus === 'failed' && (
+                        <p style={{ color: '#9b1c2c', fontSize: '0.88rem' }}>
+                          &#9888; Deposit not collected &mdash;{' '}
+                          <Link to={`/costumes/${b.costumeId}`}>retry or contact us</Link>
+                        </p>
+                      )}
+                      {b.notes && <p className="booking__notes">&ldquo;{b.notes}&rdquo;</p>}
+                    </div>
+                    <div className="booking__side">
+                      <span className={`badge badge--${b.status}`}>{b.status}</span>
+                      {['pending', 'confirmed'].includes(b.status) && b.startDate >= todayLocal() && (
+                        <button className="link-btn" onClick={() => cancel(b)}>Cancel</button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
         )}
 
         {tab === 'wishlist' && (
           saved === null ? <p>Loading…</p> :
-          saved.length === 0 ? <p className="empty">Nothing saved yet. Tap the heart on any costume to keep it here.</p> :
-          <div className="costume-grid">{saved.map((c) => <CostumeCard key={c.id} costume={c} />)}</div>
+          saved.length === 0
+            ? <p className="empty">Nothing saved yet. Tap the heart on any costume to keep it here.</p>
+            : <div className="costume-grid">{saved.map((c) => <CostumeCard key={c.id} costume={c} />)}</div>
         )}
       </div>
     </main>
