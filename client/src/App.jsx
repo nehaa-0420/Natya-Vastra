@@ -8,6 +8,7 @@ import CostumePage from './pages/CostumePage.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import AccountPage from './pages/AccountPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import AssistantPage from './pages/AssistantPage.jsx';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<main className="page"><div className="container"><h1 className="page-title">Page not found</h1><p><a href="/">Back to the home page</a></p></div></main>} />
       </Routes>

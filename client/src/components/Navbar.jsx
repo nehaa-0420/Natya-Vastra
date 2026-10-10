@@ -24,6 +24,7 @@ export default function Navbar() {
         <nav className="navbar__links">
           <Link to="/#collections" className="navbar__opt">Collections</Link>
           <Link to="/browse">Browse &amp; book</Link>
+          <Link to="/assistant" className="navbar__opt">Ask assistant</Link>
           <Link to="/#gallery" className="navbar__opt">Gallery</Link>
           <Link to="/#contact" className="navbar__opt">Contact</Link>
           {user ? (

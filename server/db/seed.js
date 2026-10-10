@@ -68,6 +68,9 @@ function seedCatalog({ force = false } = {}) {
 
 function ensureAdmin() {
   if (db.prepare("SELECT id FROM users WHERE role = 'admin'").get()) return null;
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+    throw new Error('Set ADMIN_PASSWORD before the first start in production.');
+  }
   const email = (process.env.ADMIN_EMAIL || 'admin@natyavastra.local').toLowerCase();
   const password = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
   db.prepare("INSERT INTO users (name, email, password_hash, role) VALUES ('Admin', ?, ?, 'admin')")

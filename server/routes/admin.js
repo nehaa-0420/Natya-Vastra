@@ -7,11 +7,12 @@ const { requireAdmin } = require('../middleware/auth');
 const { remainingFor } = require('../lib/availability');
 const { stockMap, serializeCostume, COSTUME_SELECT } = require('../lib/serialize');
 const { serializeBooking, BOOKING_SELECT } = require('./bookings');
+const { notify, bookingConfirmedEmail, bookingCancelledEmail } = require('../lib/email');
 
 const router = express.Router();
 router.use(requireAdmin);
 
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+const { UPLOAD_DIR } = require('../lib/config');
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 const upload = multer({
   storage: multer.diskStorage({
@@ -66,7 +67,14 @@ router.patch('/bookings/:id', (req, res) => {
     if (remaining < 1) return res.status(409).json({ error: 'That costume has since been booked for these dates.' });
   }
   db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, booking.id);
-  res.json(serializeBooking(db.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).get(booking.id)));
+  const updated = serializeBooking(db.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).get(booking.id));
+
+  // Tell the customer when their booking is confirmed or cancelled (only if the status really changed).
+  if (status !== booking.status && ['confirmed', 'cancelled'].includes(status)) {
+    const customer = db.prepare('SELECT name, email FROM users WHERE id = ?').get(booking.user_id);
+    if (customer) notify((status === 'confirmed' ? bookingConfirmedEmail : bookingCancelledEmail)(updated, customer));
+  }
+  res.json(updated);
 });
 
 // ---------- costumes ----------

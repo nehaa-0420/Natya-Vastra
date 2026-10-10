@@ -1,15 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
 
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const { UPLOAD_DIR } = require('./lib/config');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
+if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
+  console.warn('CORS_ORIGIN is not set: any website can call this API. Set it to your site address.');
+}
 const origins = (process.env.CORS_ORIGIN || '*').split(',').map((s) => s.trim());
 app.use(cors({ origin: origins.includes('*') ? '*' : origins }));
 app.use(express.json({ limit: '100kb' }));
@@ -24,6 +26,7 @@ app.use('/api/enquiries', require('./routes/enquiries'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/wishlist', require('./routes/wishlist'));
+app.use('/api/assistant', require('./routes/assistant'));
 app.use('/api/admin', require('./routes/admin'));
 
 app.use((req, res) => res.status(404).json({ error: 'Not found.' }));

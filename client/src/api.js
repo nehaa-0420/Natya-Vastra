@@ -69,3 +69,6 @@ export const createPaymentOrder = (bookingId) => request('/api/payments/orders',
 export const verifyPayment = (body) => request('/api/payments/verify', { method: 'POST', body });
 export const failPayment = (orderId) => request(`/api/payments/${orderId}/fail`, { method: 'POST' });
 
+
+// AI costume assistant
+export const askAssistant = (messages) => request('/api/assistant', { method: 'POST', body: { messages } });

@@ -30,10 +30,9 @@ function getTransporter() {
  * @param {{ to: string, subject: string, text: string, html?: string }} opts
  */
 async function sendMail({ to, subject, text, html }) {
-  const transporter = getTransporter();
-  if (!transporter) return; // silently skip when SMTP is not set up
-
   try {
+    const transporter = getTransporter();
+    if (!transporter) return; // silently skip when SMTP is not set up
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || 'Natya Vastra <noreply@natyavastra.in>',
       to,
@@ -60,13 +59,13 @@ function bookingCreatedEmail(booking, user) {
     `  Dates   : ${booking.startDate} to ${booking.endDate} (${booking.days} day${booking.days > 1 ? 's' : ''})`,
     booking.depositAmount
       ? `  Deposit : ₹${booking.depositAmount} ${booking.depositStatus === 'paid' ? '(paid ✓)' : '(pending)'}`
-      : '',
+      : null,
     '',
     `We confirm every booking personally. We'll be in touch soon!`,
     '',
     `— Natya Vastra / Chiguru Costumes`,
     `  WhatsApp: +91 99005 99872`
-  ].filter((l) => l !== undefined).join('\n');
+  ].filter((l) => l !== null).join('\n');
   return { to: user.email, subject, text };
 }
 
@@ -80,13 +79,13 @@ function bookingConfirmedEmail(booking, user) {
     `  Costume : ${booking.costumeName}`,
     `  Size    : ${booking.size} inches`,
     `  Dates   : ${booking.startDate} to ${booking.endDate}`,
-    booking.estimatedTotal ? `  Estimated total : ₹${booking.estimatedTotal}` : '',
+    booking.estimatedTotal ? `  Estimated total : ₹${booking.estimatedTotal}` : null,
     '',
     `Please collect the costume at our store. Contact us on WhatsApp if you have any questions.`,
     '',
     `— Natya Vastra / Chiguru Costumes`,
     `  WhatsApp: +91 99005 99872`
-  ].filter((l) => l !== undefined).join('\n');
+  ].filter((l) => l !== null).join('\n');
   return { to: user.email, subject, text };
 }
 
@@ -105,4 +104,9 @@ function bookingCancelledEmail(booking, user) {
   return { to: user.email, subject, text };
 }
 
-module.exports = { sendMail, bookingCreatedEmail, bookingConfirmedEmail, bookingCancelledEmail };
+// Fire-and-forget: the booking must never fail or slow down because an email did.
+function notify(message) {
+  sendMail(message).catch(() => {});
+}
+
+module.exports = { sendMail, notify, bookingCreatedEmail, bookingConfirmedEmail, bookingCancelledEmail };

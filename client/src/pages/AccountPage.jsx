@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { assetUrl, cancelBooking, getMyBookings, getWishlist } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import CostumeCard from '../components/CostumeCard.jsx';
+import { payDeposit } from '../lib/razorpay.js';
 
 const todayLocal = () => new Date().toLocaleDateString('en-CA');
 
@@ -12,6 +13,7 @@ export default function AccountPage() {
   const [bookings, setBookings] = useState(null);
   const [saved, setSaved] = useState(null);
   const [error, setError] = useState('');
+  const [payingId, setPayingId] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -33,6 +35,20 @@ export default function AccountPage() {
       const updated = await cancelBooking(b.id);
       setBookings((list) => list.map((x) => (x.id === b.id ? updated : x)));
     } catch (e) { setError(e.message); }
+  };
+
+  const pay = async (b) => {
+    setError('');
+    setPayingId(b.id);
+    try {
+      const updated = await payDeposit(b.id);
+      setBookings((list) => list.map((x) => (x.id === b.id ? updated : x)));
+    } catch (e) {
+      setError(e.message);
+      getMyBookings().then(setBookings).catch(() => {}); // pick up the 'failed' status
+    } finally {
+      setPayingId(null);
+    }
   };
 
   return (
@@ -61,16 +77,12 @@ export default function AccountPage() {
                       {b.depositStatus === 'paid' && b.depositAmount && (
                         <p style={{ color: '#1d6b2b', fontSize: '0.88rem' }}>&#10003; Deposit &#8377;{b.depositAmount} paid</p>
                       )}
-                      {b.depositStatus === 'awaiting' && (
-                        <p style={{ color: '#6b4a00', fontSize: '0.88rem' }}>
-                          &#9203; Deposit pending &mdash;{' '}
-                          <Link to={`/costumes/${b.costumeId}`}>pay now</Link>
-                        </p>
-                      )}
-                      {b.depositStatus === 'failed' && (
-                        <p style={{ color: '#9b1c2c', fontSize: '0.88rem' }}>
-                          &#9888; Deposit not collected &mdash;{' '}
-                          <Link to={`/costumes/${b.costumeId}`}>retry or contact us</Link>
+                      {['awaiting', 'failed'].includes(b.depositStatus) && b.depositAmount && b.status !== 'cancelled' && (
+                        <p style={{ color: b.depositStatus === 'failed' ? '#9b1c2c' : '#6b4a00', fontSize: '0.88rem' }}>
+                          {b.depositStatus === 'failed' ? 'Deposit not collected' : 'Deposit pending'} &mdash;{' '}
+                          <button className="link-btn" disabled={payingId === b.id} onClick={() => pay(b)}>
+                            {payingId === b.id ? 'Opening payment…' : `Pay \u20B9${b.depositAmount} now`}
+                          </button>
                         </p>
                       )}
                       {b.notes && <p className="booking__notes">&ldquo;{b.notes}&rdquo;</p>}

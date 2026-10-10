@@ -3,6 +3,7 @@ const db = require('../db');
 const { today, eachDay } = require('../lib/dates');
 const { createBooking } = require('../lib/availability');
 const { requireAuth } = require('../middleware/auth');
+const { notify, bookingCreatedEmail, bookingCancelledEmail } = require('../lib/email');
 
 const router = express.Router();
 
@@ -24,7 +25,8 @@ function serializeBooking(r) {
     endDate: r.end_date,
     days,
     status: r.status,
-    depositStatus: r.deposit_status,
+    // A priced costume always owes a deposit, even if the payment window was never opened.
+    depositStatus: r.deposit_status === 'not_required' && r.rent_price ? 'awaiting' : r.deposit_status,
     rentPrice: r.rent_price,
     notes: r.notes,
     estimatedTotal: r.rent_price ? r.rent_price * days : null,
@@ -46,7 +48,9 @@ router.post('/', requireAuth, (req, res) => {
   });
   if (result.error) return res.status(result.status).json({ error: result.error });
   const row = db.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).get(result.id);
-  res.status(201).json(serializeBooking(row));
+  const booking = serializeBooking(row);
+  notify(bookingCreatedEmail(booking, req.user));
+  res.status(201).json(booking);
 });
 
 router.get('/mine', requireAuth, (req, res) => {
@@ -64,7 +68,9 @@ router.post('/:id/cancel', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'This rental has already started. Please contact us to make changes.' });
   }
   db.prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ?").run(row.id);
-  res.json(serializeBooking(db.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).get(row.id)));
+  const booking = serializeBooking(db.prepare(`${BOOKING_SELECT} WHERE b.id = ?`).get(row.id));
+  notify(bookingCancelledEmail(booking, req.user));
+  res.json(booking);
 });
 
 module.exports = router;
