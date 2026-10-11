@@ -58,34 +58,49 @@ class AssistantError extends Error {
 }
 
 async function askAssistant(messages) {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = process.env.GEMINI_API_KEY;
   if (!key) throw new AssistantError('NOT_CONFIGURED', 'The assistant is not set up.');
 
-  const base = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const base = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com';
+  // Gemini 3 models "think" by default and thinking tokens use up the output limit,
+  // so keep thinking low and leave plenty of room. Set GEMINI_THINKING_LEVEL= (empty) to omit it.
+  const thinking = process.env.GEMINI_THINKING_LEVEL ?? 'low';
+
   let res;
   try {
-    res = await fetch(`${base}/v1/messages`, {
+    res = await fetch(`${base}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5',
-        // Haiku 5.5 "thinks" by default and thinking tokens count toward max_tokens,
-        // so a small limit can be used up before any answer text is written.
-        max_tokens: 4000,
-        output_config: { effort: process.env.ANTHROPIC_EFFORT || 'low' }, // low = fast and cheap, plenty for this chat
-        system: buildSystemPrompt(),
-        messages
+        systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
+        contents: messages.map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        })),
+        generationConfig: {
+          responseMimeType: 'application/json',
+          maxOutputTokens: 4000,
+          ...(thinking && { thinkingConfig: { thinkingLevel: thinking } })
+        }
       }),
       signal: AbortSignal.timeout(25000)
     });
   } catch (err) {
     throw new AssistantError('UPSTREAM', `Could not reach the AI service: ${err.message}`);
   }
-  if (!res.ok) throw new AssistantError('UPSTREAM', `AI service returned ${res.status}`);
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).slice(0, 300);
+    throw new AssistantError('UPSTREAM', `AI service returned ${res.status}: ${detail}`);
+  }
 
   const data = await res.json();
-  const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
-  if (!text) throw new AssistantError('UPSTREAM', `The AI service sent no text (stop_reason: ${data.stop_reason}).`);
+  const candidate = data.candidates?.[0];
+  const text = (candidate?.content?.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
+  if (!text) {
+    const why = candidate?.finishReason || data.promptFeedback?.blockReason || 'unknown reason';
+    throw new AssistantError('UPSTREAM', `The AI service sent no text (${why}).`);
+  }
   return parseReply(text);
 }
 
