@@ -69,7 +69,10 @@ async function askAssistant(messages) {
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5',
-        max_tokens: 700,
+        // Haiku 5.5 "thinks" by default and thinking tokens count toward max_tokens,
+        // so a small limit can be used up before any answer text is written.
+        max_tokens: 4000,
+        output_config: { effort: process.env.ANTHROPIC_EFFORT || 'low' }, // low = fast and cheap, plenty for this chat
         system: buildSystemPrompt(),
         messages
       }),
@@ -82,7 +85,7 @@ async function askAssistant(messages) {
 
   const data = await res.json();
   const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
-  if (!text) throw new AssistantError('UPSTREAM', 'The AI service sent an empty answer.');
+  if (!text) throw new AssistantError('UPSTREAM', `The AI service sent no text (stop_reason: ${data.stop_reason}).`);
   return parseReply(text);
 }
 

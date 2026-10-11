@@ -56,6 +56,8 @@ test('sends the API key, the model and a system prompt grounded in the real cata
   await ask([user('hello')]);
   assert.equal(lastRequest.headers['x-api-key'], 'sk-test-key');
   assert.ok(lastRequest.body.model);
+  assert.ok(lastRequest.body.max_tokens >= 2000);            // room for thinking tokens as well as the answer
+  assert.deepEqual(lastRequest.body.output_config, { effort: 'low' });
   const system = lastRequest.body.system;
   assert.match(system, /Never invent/);
   assert.match(system, new RegExp(`"id":${costumeId}`));
