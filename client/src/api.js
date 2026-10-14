@@ -1,8 +1,16 @@
-// Change VITE_API_BASE (in client/.env) once the backend is deployed.
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+// Configurable API base URL for deployment on Vercel connecting to Render.
+// If VITE_API_BASE is set (e.g. 'https://natya-vastra-api.onrender.com'), use it;
+// otherwise fall back to local development server ('http://localhost:4000').
+const rawBase = (import.meta.env.VITE_API_BASE || 'http://localhost:4000').trim().replace(/\/+$/, '');
+export const API_BASE = rawBase.endsWith('/api') ? rawBase.slice(0, -4) : rawBase;
 
-// Photos uploaded by the admin are served by the API; the original photos ship with the site.
-export const assetUrl = (p) => (p && p.startsWith('/uploads') ? API_BASE + p : p);
+// Photos uploaded by admin or users are served by the backend; catalog photos ship with the frontend static bundle.
+export const assetUrl = (p) => {
+  if (!p) return '';
+  if (p.startsWith('http://') || p.startsWith('https://')) return p;
+  if (p.startsWith('/uploads')) return API_BASE + p;
+  return p;
+};
 
 const KEY = 'nv_token';
 export const getToken = () => localStorage.getItem(KEY);
@@ -20,7 +28,7 @@ async function request(path, { method = 'GET', body, form } = {}) {
   try {
     res = await fetch(API_BASE + path, { method, headers, body: payload });
   } catch {
-    throw new Error("Can't reach the server. Please check that the backend is running.");
+    throw new Error("Can't reach the server. Please check that the backend is running and CORS allows this domain.");
   }
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);

@@ -1,14 +1,32 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
+const { DB_PATH } = require('../lib/config');
 
-// DB_PATH lets tests use ':memory:' without touching the real database.
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'natya_vastra.db');
+// Ensure database directory exists before mounting (e.g. on /var/data persistent disk)
+if (DB_PATH !== ':memory:') {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+}
+
 const db = new DatabaseSync(DB_PATH);
 
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
+db.exec('PRAGMA wal_autocheckpoint = 1000');
 db.exec(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
+
+// Truncate checkpoint WAL on clean shutdown so changes merge cleanly into primary .db file
+function closeDb() {
+  try {
+    if (DB_PATH !== ':memory:') {
+      db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    }
+  } catch {
+    // Ignore error during exit
+  }
+}
+process.on('SIGTERM', closeDb);
+process.on('SIGINT', closeDb);
 
 // Backward compatibility: add new columns to existing bookings tables if not already present
 try {
@@ -41,4 +59,3 @@ try {
 }
 
 module.exports = db;
-

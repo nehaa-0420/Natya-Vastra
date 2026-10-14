@@ -76,13 +76,87 @@ SMTP_USER=you@gmail.com
 SMTP_PASS=app-password
 EMAIL_FROM="Natya Vastra <you@gmail.com>"
 
-# MongoDB (Mongoose)
-MONGODB_URI=mongodb://localhost:27017/natya_vastra
+# MongoDB (Mongoose) - use MongoDB Atlas for managed high-availability in production
+MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/natya_vastra
 
 # Optional Google Gemini AI assistant
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.6-flash
+
+# Persistent disk paths (configured on Render)
+DB_PATH=/var/data/natya_vastra.db
+UPLOAD_DIR=/var/data/uploads
 ```
+
+---
+
+## Production Deployment (Render + Vercel)
+
+### Architecture
+- **Backend API:** Hosted on **Render** (Node.js runtime, port 10000, bound to `0.0.0.0`).
+- **Primary Database & Uploads:** Persistent Disk mounted at `/var/data` (stores `natya_vastra.db*` and `uploads/`).
+- **Document Store:** **MongoDB Atlas** (inspections, damage reports, complaints, audit logs).
+- **Frontend SPA:** Hosted on **Vercel** (`client/` root, Vite build, client-side rewrites in `vercel.json`).
+
+---
+
+### Step 1: Deploy Backend to Render
+
+1. Log in to your [Render Dashboard](https://dashboard.render.com).
+2. Click **New +** → **Blueprint** (or **Web Service**).
+3. Connect your GitHub repository: `https://github.com/nehaa-0420/Natya-Vastra`.
+4. If deploying via **render.yaml Blueprint**:
+   - Render automatically detects `render.yaml` with the persistent disk and settings.
+5. If creating a **Web Service manually**:
+   - **Name:** `natya-vastra-api`
+   - **Root Directory:** `server`
+   - **Runtime:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+   - **Plan:** `Starter` (required for persistent disk storage)
+   - **Health Check Path:** `/api/health`
+   - **Persistent Disk:**
+     - Click **Disks** → **Add Disk**
+     - Name: `natya-vastra-disk`
+     - Mount Path: `/var/data`
+     - Size: `1 GB`
+   - **Environment Variables:**
+     - `NODE_VERSION`: `22.12.0` (required for built-in `node:sqlite`)
+     - `NODE_ENV`: `production`
+     - `PORT`: `10000`
+     - `HOST`: `0.0.0.0`
+     - `JWT_SECRET`: generate a 32+ character random secret
+     - `ADMIN_EMAIL`: your administrative login email
+     - `ADMIN_PASSWORD`: your secure administrative password
+     - `DB_PATH`: `/var/data/natya_vastra.db`
+     - `UPLOAD_DIR`: `/var/data/uploads`
+     - `MONGODB_URI`: your MongoDB Atlas connection string
+     - `GEMINI_API_KEY`: your Google Gemini API key
+     - `GEMINI_MODEL`: `gemini-3.6-flash`
+     - `CORS_ORIGIN`: `https://YOUR-SITE.vercel.app` (update after deploying Vercel frontend)
+     - `ALLOW_VERCEL_PREVIEWS`: `true`
+6. Click **Create Web Service**.
+7. Once deployed, verify the health check:
+   `https://natya-vastra-api.onrender.com/api/health` → returns `{"status":"ok","services":{"database":"connected"}}`.
+
+---
+
+### Step 2: Deploy Frontend to Vercel
+
+1. Log in to [Vercel](https://vercel.com) and click **Add New...** → **Project**.
+2. Select your `Natya-Vastra` repository.
+3. In project configuration:
+   - **Root Directory:** click **Edit** and choose `client`.
+   - **Framework Preset:** `Vite` (automatically detected).
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install`
+4. Expand **Environment Variables**:
+   - Name: `VITE_API_BASE`
+   - Value: `https://YOUR-RENDER-SERVICE.onrender.com` (your deployed Render API URL, without trailing slash).
+5. Click **Deploy**.
+6. Once deployed, note your Vercel URL (e.g. `https://natya-vastra.vercel.app`).
+7. Return to Render and update the backend's `CORS_ORIGIN` environment variable with your Vercel URL!
 
 ---
 
@@ -128,13 +202,15 @@ npm test
 ```
 
 ### Verified Scenarios:
-1. A costume returned on time does not incur a late penalty.
-2. A standard costume returned after the agreed one-day deadline incurs exactly one ₹250 late penalty.
-3. The standard rental plus the late penalty totals ₹900 before any separately approved charges.
-4. The administrator can record a costume inspection and submit a damage report.
-5. The customer receives the damage-report email when email delivery is configured.
-6. A customer can submit a complaint and track its status.
-7. An administrator can review, respond to, and resolve complaints.
-8. Customers cannot view another customer's complaint or private report.
-9. Failed email delivery does not lose the complaint or inspection record.
-10. All records and statuses persist correctly after restarting the server.
+1. Health endpoint (`/api/health`) verifies SQLite and service status without leaking credentials.
+2. A costume returned on time does not incur a late penalty.
+3. A standard costume returned after the agreed one-day deadline incurs exactly one ₹250 late penalty.
+4. The standard rental plus the late penalty totals ₹900 before any separately approved charges.
+5. The administrator can record a costume inspection and submit a damage report.
+6. The customer receives the damage-report email when email delivery is configured.
+7. A customer can submit a complaint and track its status.
+8. An administrator can review, respond to, and resolve complaints.
+9. Customers cannot view another customer's complaint or private report.
+10. Failed email delivery does not lose the complaint or inspection record.
+11. All records and statuses persist correctly in MongoDB after restarting the server.
+

@@ -2,8 +2,13 @@ const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose');
 
+const { MONGO_DATA_FILE } = require('../lib/config');
+
 let _isConnected = false;
-const DATA_FILE = process.env.MONGO_DATA_FILE || path.join(__dirname, 'mongo_data.json');
+const DATA_FILE = MONGO_DATA_FILE;
+if (DATA_FILE !== ':memory:') {
+  try { fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true }); } catch { /* ignore */ }
+}
 
 // Memory/file-backed persistent store for offline development and isolated test suites
 class DocumentStore {
@@ -265,22 +270,29 @@ function createAdaptiveModel(modelName, schema) {
 }
 
 async function connectMongo(uri = process.env.MONGODB_URI) {
-  if (_isConnected) return true;
+  if (_isConnected && mongoose.connection.readyState === 1) return true;
   if (!uri) {
     _isConnected = false;
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(`[MongoDB] Notice: MONGODB_URI is not set. Rental inspections and complaints will persist in ${DATA_FILE}. For managed cloud storage, set MONGODB_URI to your MongoDB Atlas cluster.`);
+    }
     return false;
   }
   try {
     await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 2000,
-      connectTimeoutMS: 2000
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000
     });
     _isConnected = true;
     console.log('[MongoDB] Connected to MongoDB via Mongoose successfully.');
     return true;
   } catch (err) {
     _isConnected = false;
-    console.warn(`[MongoDB] Note: MongoDB connection skipped (${err.message}). Running with persistent store.`);
+    const sanitizedUri = String(uri).replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@');
+    console.error(`[MongoDB] Connection failed to ${sanitizedUri}: ${err.message}`);
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(`[MongoDB] Operating with local fallback store at ${DATA_FILE}. Please check your MongoDB Atlas connection string and Network Access whitelist (allow 0.0.0.0/0).`);
+    }
     return false;
   }
 }
