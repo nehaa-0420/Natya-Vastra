@@ -75,7 +75,25 @@ CREATE TABLE IF NOT EXISTS bookings (
   deposit_status TEXT NOT NULL DEFAULT 'not_required'
                  CHECK (deposit_status IN ('not_required','awaiting','paid','failed')),
   notes          TEXT,
+  rental_price   INTEGER,
+  return_deadline TEXT,
+  actual_return_time TEXT,
+  late_penalty   INTEGER NOT NULL DEFAULT 0,
+  damage_charge  INTEGER NOT NULL DEFAULT 0,
+  total_amount   INTEGER,
+  total_quantity INTEGER NOT NULL DEFAULT 1,
+  is_late        INTEGER NOT NULL DEFAULT 0,
+  accepted_terms INTEGER NOT NULL DEFAULT 0,
+  accepted_terms_at TEXT,
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Line items for multi-size bookings (e.g. Size 26 x 2, Size 28 x 3)
+CREATE TABLE IF NOT EXISTS booking_items (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  size       INTEGER NOT NULL,
+  quantity   INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0)
 );
 
 -- Razorpay payment records linked to a booking (one per attempt).
@@ -93,3 +111,4 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS idx_costumes_category ON costumes(category_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_costume ON bookings(costume_id, status);
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
+CREATE INDEX IF NOT EXISTS idx_booking_items_booking_id ON booking_items(booking_id);

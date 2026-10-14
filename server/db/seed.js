@@ -44,15 +44,16 @@ function seedCatalog({ force = false } = {}) {
     db.prepare('DELETE FROM categories').run();
 
     const addCat = db.prepare('INSERT INTO categories (id, name, description, accent_color, sort_order, note) VALUES (?, ?, ?, ?, ?, ?)');
-    const addCostume = db.prepare('INSERT INTO costumes (category_id, image_path, size_min, size_max, sort_order) VALUES (?, ?, ?, ?, ?)');
+    const addCostume = db.prepare('INSERT INTO costumes (category_id, image_path, size_min, size_max, sort_order, rent_price) VALUES (?, ?, ?, ?, ?, ?)');
     const addStock = db.prepare('INSERT INTO costume_stock (costume_id, size, qty) VALUES (?, ?, ?)');
     const addGallery = db.prepare('INSERT INTO gallery_images (image_path, sort_order) VALUES (?, ?)');
 
     for (const cat of CATEGORIES) {
       addCat.run(cat.id, cat.name, cat.description, cat.accent_color, cat.sort_order, cat.note || null);
+      const defaultPrice = cat.id === 'saree' ? 1500 : (cat.id === 'devi' ? null : 650);
       cat.images.forEach((num, i) => {
         const sz = SIZES[String(num)];
-        const r = addCostume.run(cat.id, imgPath(num), sz ? sz.sizeRange[0] : null, sz ? sz.sizeRange[1] : null, i);
+        const r = addCostume.run(cat.id, imgPath(num), sz ? sz.sizeRange[0] : null, sz ? sz.sizeRange[1] : null, i, defaultPrice);
         if (!sz) return; // saree sets / devi: no stock data, enquiry only
         if (sz.sizes.length) sz.sizes.forEach((s) => addStock.run(r.lastInsertRowid, s.size, s.count));
         else addStock.run(r.lastInsertRowid, 0, sz.total); // only a total is known: pooled stock
@@ -67,15 +68,37 @@ function seedCatalog({ force = false } = {}) {
 }
 
 function ensureAdmin() {
-  if (db.prepare("SELECT id FROM users WHERE role = 'admin'").get()) return null;
-  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+  const envEmail = process.env.ADMIN_EMAIL;
+  const envPassword = process.env.ADMIN_PASSWORD;
+  const email = (envEmail || 'admin@natyavastra.local').toLowerCase();
+  const password = envPassword || 'ChangeMe123!';
+
+  const existingAdmin = db.prepare("SELECT id, email, password_hash FROM users WHERE role = 'admin'").get();
+  if (existingAdmin) {
+    if ((envEmail && existingAdmin.email !== email) || (envPassword && !require('../lib/password').verifyPassword(password, existingAdmin.password_hash))) {
+      const targetUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      if (targetUser && targetUser.id !== existingAdmin.id) {
+        db.prepare("UPDATE users SET role = 'admin', password_hash = ? WHERE id = ?").run(hashPassword(password), targetUser.id);
+      } else {
+        db.prepare("UPDATE users SET email = ?, password_hash = ? WHERE id = ?").run(email, hashPassword(password), existingAdmin.id);
+      }
+    }
+    return null;
+  }
+
+  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  if (existingUser) {
+    db.prepare("UPDATE users SET role = 'admin', password_hash = ? WHERE id = ?").run(hashPassword(password), existingUser.id);
+    return { email, usingDefaultPassword: !envPassword };
+  }
+
+  if (process.env.NODE_ENV === 'production' && !envPassword) {
     throw new Error('Set ADMIN_PASSWORD before the first start in production.');
   }
-  const email = (process.env.ADMIN_EMAIL || 'admin@natyavastra.local').toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
+
   db.prepare("INSERT INTO users (name, email, password_hash, role) VALUES ('Admin', ?, ?, 'admin')")
     .run(email, hashPassword(password));
-  return { email, usingDefaultPassword: !process.env.ADMIN_PASSWORD };
+  return { email, usingDefaultPassword: !envPassword };
 }
 
 function seedIfEmpty() {

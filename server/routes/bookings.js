@@ -14,6 +14,35 @@ const BOOKING_SELECT = `SELECT b.*, c.image_path, c.name AS costume_name, c.sort
 
 function serializeBooking(r) {
   const days = eachDay(r.start_date, r.end_date).length;
+
+  let items = [];
+  try {
+    items = db.prepare('SELECT size, quantity FROM booking_items WHERE booking_id = ? ORDER BY size').all(r.id);
+  } catch {
+    // Graceful fallback if table is not yet initialized in isolated test
+  }
+
+  const totalQuantity = r.total_quantity || (items.length ? items.reduce((sum, i) => sum + i.quantity, 0) : 1);
+  if (!items.length && r.size) {
+    items = [{ size: r.size, quantity: totalQuantity }];
+  }
+
+  const sizeSummary = items.length > 1
+    ? items.map((i) => `Size ${i.size} (×${i.quantity})`).join(', ')
+    : (items[0] ? `Size ${items[0].size}${items[0].quantity > 1 ? ` (×${items[0].quantity})` : ''}` : `Size ${r.size}`);
+
+  const isPriced = r.rent_price != null && r.rent_price > 0;
+  const baseRental = isPriced
+    ? (r.rental_price != null ? r.rental_price : (r.rent_price * days * totalQuantity))
+    : (r.rental_price != null ? r.rental_price : null);
+  const returnDeadline = r.return_deadline || `${r.end_date}T20:00:00`;
+  const latePenalty = r.late_penalty || 0;
+  const damageCharge = r.damage_charge || 0;
+  const totalAmount = isPriced
+    ? (r.total_amount != null ? r.total_amount : ((baseRental || 0) + latePenalty + damageCharge))
+    : null;
+  const depositAmount = isPriced && baseRental != null ? Math.ceil(baseRental / 2) : null;
+
   return {
     id: r.id,
     costumeId: r.costume_id,
@@ -21,27 +50,43 @@ function serializeBooking(r) {
     categoryName: r.category_name,
     src: r.image_path,
     size: r.size,
+    items,
+    totalQuantity,
+    sizeSummary,
     startDate: r.start_date,
     endDate: r.end_date,
     days,
     status: r.status,
-    // A priced costume always owes a deposit, even if the payment window was never opened.
-    depositStatus: r.deposit_status === 'not_required' && r.rent_price ? 'awaiting' : r.deposit_status,
-    rentPrice: r.rent_price,
+    depositStatus: isPriced && r.deposit_status === 'not_required' ? 'awaiting' : r.deposit_status,
+    rentPrice: isPriced ? r.rent_price : null,
     notes: r.notes,
-    estimatedTotal: r.rent_price ? r.rent_price * days : null,
-    depositAmount: r.rent_price ? Math.ceil((r.rent_price * days) / 2) : null,
+    estimatedTotal: isPriced ? baseRental : null,
+    depositAmount,
+    // Rental terms & penalty data
+    rentalPrice: baseRental,
+    returnDeadline,
+    actualReturnTime: r.actual_return_time || null,
+    isLate: Boolean(r.is_late),
+    latePenalty,
+    damageCharge,
+    totalAmount,
+    acceptedTerms: r.accepted_terms !== 0,
+    acceptedTermsAt: r.accepted_terms_at || null,
     createdAt: r.created_at,
     ...(r.user_name !== undefined && { user: { name: r.user_name, email: r.user_email, phone: r.user_phone } })
   };
 }
 
 router.post('/', requireAuth, (req, res) => {
-  const { costumeId, size, startDate, endDate, notes } = req.body;
+  if (req.body.acceptedTerms === false) {
+    return res.status(400).json({ error: 'You must accept the rental terms and conditions to book.' });
+  }
+  const { costumeId, size, items, startDate, endDate, notes } = req.body;
   const result = createBooking(db, {
     userId: req.user.id,
     costumeId: Number(costumeId),
     size,
+    items,
     startDate: String(startDate || ''),
     endDate: String(endDate || ''),
     notes

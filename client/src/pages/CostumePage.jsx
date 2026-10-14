@@ -1,40 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import {
-  assetUrl, createBooking, createPaymentOrder, failPayment,
-  getAvailability, getCostume, verifyPayment
-} from '../api.js';
+import { assetUrl, createBooking, getAvailability, getCostume } from '../api.js';
+import { payDeposit } from '../lib/razorpay.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { costumeTitle } from '../components/CostumeCard.jsx';
 
 const WA_NUMBER = '919900599872';
 const todayLocal = () => new Date().toLocaleDateString('en-CA');
 const dayCount = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000) + 1;
-
-// ── Open the Razorpay checkout modal ─────────────────────────────────────
-function openRazorpay({ order, onSuccess, onDismiss }) {
-  if (typeof window.Razorpay === 'undefined') {
-    onDismiss('Razorpay could not be loaded. Please try again or contact us.');
-    return;
-  }
-  const rzp = new window.Razorpay({
-    key: order.keyId,
-    amount: order.amountPaise,
-    currency: order.currency,
-    order_id: order.orderId,
-    name: 'Natya Vastra',
-    description: `Deposit for booking #${order.bookingId}`,
-    prefill: {
-      name: order.customerName,
-      email: order.customerEmail,
-      contact: order.customerPhone
-    },
-    theme: { color: '#8B4513' },
-    handler: onSuccess,
-    modal: { ondismiss: () => onDismiss(null) }
-  });
-  rzp.open();
-}
 
 export default function CostumePage() {
   const { id } = useParams();
@@ -44,7 +17,6 @@ export default function CostumePage() {
 
   const [costume, setCostume] = useState(null);
   const [loadError, setLoadError] = useState('');
-  const [size, setSize] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [notes, setNotes] = useState('');
@@ -52,21 +24,29 @@ export default function CostumePage() {
   const [availError, setAvailError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsDetails, setShowTermsDetails] = useState(false);
+
+  // Multi-size selection: Map of { [size]: quantity }
+  const [sizeQuantities, setSizeQuantities] = useState({});
 
   // Payment states
-  const [booking, setBooking] = useState(null);      // just-created booking
-  const [payOrder, setPayOrder] = useState(null);    // Razorpay order details
-  const [paidBooking, setPaidBooking] = useState(null); // after successful verify
+  const [booking, setBooking] = useState(null);          // created booking
+  const [paying, setPaying] = useState(false);
+  const [paidBooking, setPaidBooking] = useState(null);  // after verified payment
   const [payError, setPayError] = useState('');
 
   useEffect(() => {
-    setCostume(null); setLoadError('');
+    setCostume(null);
+    setLoadError('');
+    setSizeQuantities({});
     getCostume(id).then(setCostume).catch((e) => setLoadError(e.message));
   }, [id]);
 
   const datesReady = start && end && end >= start;
   useEffect(() => {
-    setAvail(null); setAvailError('');
+    setAvail(null);
+    setAvailError('');
     if (!datesReady) return undefined;
     let stale = false;
     getAvailability(id, start, end)
@@ -75,6 +55,7 @@ export default function CostumePage() {
     return () => { stale = true; };
   }, [id, start, end, datesReady]);
 
+  // Available size options for this costume
   const sizeOptions = useMemo(() => {
     if (!costume) return [];
     if (costume.pooled) {
@@ -90,7 +71,52 @@ export default function CostumePage() {
     const row = costume.pooled ? avail[0] : avail.find((a) => a.size === s);
     return row ? row.remaining : 0;
   };
-  const chosenRemaining = size ? remainingFor(Number(size)) : null;
+
+  // Helper to adjust quantity for a size
+  const updateQuantity = (sz, delta) => {
+    setError('');
+    const current = sizeQuantities[sz] || 0;
+    const maxAllowed = remainingFor(sz) != null ? remainingFor(sz) : 99;
+    const next = Math.max(0, Math.min(maxAllowed, current + delta));
+
+    setSizeQuantities((prev) => {
+      const copy = { ...prev };
+      if (next === 0) {
+        delete copy[sz];
+      } else {
+        copy[sz] = next;
+      }
+      return copy;
+    });
+  };
+
+  const setDirectQuantity = (sz, val) => {
+    setError('');
+    const parsed = parseInt(val, 10);
+    const maxAllowed = remainingFor(sz) != null ? remainingFor(sz) : 99;
+    if (isNaN(parsed) || parsed <= 0) {
+      setSizeQuantities((prev) => {
+        const copy = { ...prev };
+        delete copy[sz];
+        return copy;
+      });
+      return;
+    }
+    const cleanVal = Math.min(maxAllowed, parsed);
+    setSizeQuantities((prev) => ({ ...prev, [sz]: cleanVal }));
+  };
+
+  // Total quantity and items array
+  const totalPieces = useMemo(() => {
+    return Object.values(sizeQuantities).reduce((sum, qty) => sum + qty, 0);
+  }, [sizeQuantities]);
+
+  const selectedItems = useMemo(() => {
+    return Object.entries(sizeQuantities)
+      .map(([sz, qty]) => ({ size: Number(sz), quantity: qty }))
+      .filter((item) => item.quantity > 0)
+      .sort((a, b) => a.size - b.size);
+  }, [sizeQuantities]);
 
   if (loadError) {
     return (
@@ -107,10 +133,12 @@ export default function CostumePage() {
   const title = costumeTitle(costume);
   const saved = wishlist.has(costume.id);
   const days = datesReady ? dayCount(start, end) : 0;
-  const estimate = costume.rentPrice && days ? costume.rentPrice * days : null;
-  const waText = `Namaste! I'm interested in the ${title} costume (${costume.categoryName}). Could you share availability and pricing?`;
+  const estimate = costume.rentPrice && days && totalPieces ? costume.rentPrice * days * totalPieces : null;
+  const depositAmount = estimate ? Math.ceil(estimate / 2) : null;
+
+  const waText = `Namaste! I'm interested in the ${title} costume (${costume.categoryName}). Could you share availability and details?`;
   const bookingWaText = booking
-    ? `Hi! I just requested booking #${booking.id} for the ${title} costume, size ${booking.size}, ${booking.startDate} to ${booking.endDate}.`
+    ? `Hi! I just placed booking request #${booking.id} for the ${title} costume (${booking.sizeSummary || `size ${booking.size}`}), from ${booking.startDate} to ${booking.endDate}.`
     : '';
 
   const onHeart = async () => {
@@ -118,277 +146,430 @@ export default function CostumePage() {
     if (!ok) navigate('/login', { state: { from: location } });
   };
 
-  // ── Step 2: open Razorpay modal for a given booking ─────────────────────
+  // ── Trigger Razorpay payment ──────────────────────────────────────────
   const startPayment = async (bk) => {
     setPayError('');
-    let order;
+    setPaying(true);
     try {
-      order = await createPaymentOrder(bk.id);
-      setPayOrder(order);
+      const paid = await payDeposit(bk.id);
+      setPaidBooking(paid);
     } catch (err) {
       setPayError(err.message);
-      return;
+    } finally {
+      setPaying(false);
     }
-
-    openRazorpay({
-      order,
-      onSuccess: async (response) => {
-        try {
-          const paid = await verifyPayment({
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature
-          });
-          setPaidBooking(paid);
-          setPayOrder(null);
-        } catch (err) {
-          setPayError(err.message);
-        }
-      },
-      onDismiss: async (msg) => {
-        // Payment window closed — mark attempt as failed but keep booking
-        try { await failPayment(order.orderId); } catch { /* ignore */ }
-        setPayOrder(null);
-        if (msg) setPayError(msg);
-        else setPayError('Payment was not completed. You can retry below or contact us on WhatsApp.');
-      }
-    });
   };
 
-  // ── Step 1: submit booking form ──────────────────────────────────────────
+  // ── Submit multi-size booking ─────────────────────────────────────────
   const submit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!size) return setError('Please choose a size.');
-    if (!datesReady) return setError('Please choose your start and end dates.');
+
+    if (!user) {
+      return navigate('/login', { state: { from: location } });
+    }
+    if (!datesReady) {
+      return setError('Please choose your rental start and end dates.');
+    }
+    if (selectedItems.length === 0) {
+      return setError('Please select at least one size and quantity.');
+    }
+    if (!acceptedTerms) {
+      return setError('Please review and check the box to accept the Rental Terms and Conditions.');
+    }
+
     setSubmitting(true);
     try {
       const bk = await createBooking({
-        costumeId: costume.id, size: Number(size),
-        startDate: start, endDate: end, notes
+        costumeId: costume.id,
+        items: selectedItems,
+        startDate: start,
+        endDate: end,
+        notes,
+        acceptedTerms: true
       });
       setBooking(bk);
-      if (bk.rentPrice) {
-        await startPayment(bk);
-      }
-      // No rent price → booking panel shows WhatsApp CTA automatically
+      // Online payment is unlocked once the administrator confirms the booking.
     } catch (err) {
       setError(err.message);
-      getAvailability(id, start, end).then(setAvail).catch(() => {});
+      if (datesReady) {
+        getAvailability(id, start, end).then(setAvail).catch(() => {});
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render Booking Panel ──────────────────────────────────────────────
   const renderPanel = () => {
+    // 1. Saree & Special Order Costumes (Enquiry / WhatsApp only)
     if (!costume.bookable) {
       return (
-        <div className="panel">
-          <h2>Ask us about this one</h2>
-          <p>This costume is arranged personally rather than booked online. Message us and we will confirm sizes and price.</p>
-          <a className="btn btn-primary" target="_blank" rel="noreferrer"
-             href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(waText)}`}>
+        <div className="panel" role="region" aria-label="Costume Enquiry">
+          <h2>Special Order / Custom Fitting</h2>
+          <p>
+            This exquisite costume ({costume.categoryName}) is custom-fitted or arranged personally.
+            Message our store master on WhatsApp to check measurements, saree draping requirements, and pricing.
+          </p>
+          <a
+            className="btn btn-primary"
+            target="_blank"
+            rel="noreferrer"
+            href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(waText)}`}
+          >
             Enquire on WhatsApp
           </a>
         </div>
       );
     }
 
+    // 2. Deposit Paid Successfully
     if (paidBooking) {
       return (
-        <div className="panel panel--ok" role="status">
-          <h2>Deposit paid — you&rsquo;re all set! ✅</h2>
+        <div className="panel panel--ok animate-fade-in" role="status">
+          <h2>Deposit Paid — Booking Confirmed! ✅</h2>
           <p>
-            Booking <strong>#{paidBooking.id}</strong> · size <strong>{paidBooking.size}</strong>{' '}
-            · <strong>{paidBooking.startDate}</strong> to <strong>{paidBooking.endDate}</strong>{' '}
-            ({paidBooking.days} day{paidBooking.days > 1 ? 's' : ''}).{' '}
-            Your deposit of <strong>₹{paidBooking.depositAmount}</strong> has been received.
-            We will confirm the booking shortly. See it under <Link to="/account">My account</Link>.
+            Booking <strong>#{paidBooking.id}</strong> ·{' '}
+            <strong>{paidBooking.sizeSummary || `Size ${paidBooking.size}`}</strong>{' '}
+            ({paidBooking.totalQuantity || 1} piece{(paidBooking.totalQuantity || 1) > 1 ? 's' : ''})
           </p>
-          <a className="btn btn-primary" target="_blank" rel="noreferrer"
-             href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(bookingWaText)}`}>
-            Message us on WhatsApp
-          </a>
-        </div>
-      );
-    }
-
-    // Booking exists but no rent price → WhatsApp handoff
-    if (booking && !booking.rentPrice) {
-      return (
-        <div className="panel panel--ok" role="status">
-          <h2>Booking request received</h2>
-          <p>
-            Thank you! We have held <strong>size {booking.size}</strong> for{' '}
-            <strong>{booking.startDate}</strong> to <strong>{booking.endDate}</strong>{' '}
-            ({booking.days} day{booking.days > 1 ? 's' : ''}).
-            This costume is priced on request — please message us to confirm the rental amount
-            and finalise your booking. You can also track it under <Link to="/account">My account</Link>.
+          <div className="booking-deadline-pill">
+            <span>📅 Rental Dates: <strong>{paidBooking.startDate} to {paidBooking.endDate} ({paidBooking.days} day{paidBooking.days > 1 ? 's' : ''})</strong></span>
+            <span>⏰ Return Deadline: <strong>{paidBooking.returnDeadline ? paidBooking.returnDeadline.replace('T', ' at ') : `${paidBooking.endDate} at 8:00 PM`}</strong></span>
+          </div>
+          <p style={{ marginTop: '0.75rem' }}>
+            Your 50% deposit of <strong>₹{paidBooking.depositAmount}</strong> has been received.
+            The remaining balance is payable upon costume collection at our store.
           </p>
-          <a className="btn btn-primary" target="_blank" rel="noreferrer"
-             href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(bookingWaText)}`}>
-            Confirm pricing on WhatsApp
-          </a>
-        </div>
-      );
-    }
-
-    // Payment failed / dismissed — allow retry
-    if (booking && payError && !payOrder) {
-      return (
-        <div className="panel" role="status">
-          <h2>Payment not completed</h2>
-          <p>
-            Your booking <strong>#{booking.id}</strong> is saved, but the deposit was not collected.
-            You can pay now or contact us on WhatsApp to arrange payment.
-          </p>
-          {payError && <p className="form-error">{payError}</p>}
-          <div className="panel-actions">
-            <button className="btn btn-primary" onClick={() => startPayment(booking)}>
-              Retry deposit — ₹{booking.depositAmount}
-            </button>
-            <a className="btn btn-outline" target="_blank" rel="noreferrer"
-               href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(bookingWaText)}`}>
-              Contact us on WhatsApp
+          <div className="panel-actions" style={{ marginTop: '1rem' }}>
+            <Link to="/account" className="btn btn-primary">
+              View in My Account
+            </Link>
+            <a
+              className="btn btn-outline"
+              target="_blank"
+              rel="noreferrer"
+              href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(bookingWaText)}`}
+            >
+              Message us on WhatsApp
             </a>
           </div>
         </div>
       );
     }
 
-    // Awaiting payment (modal should be open)
-    if (booking && payOrder) {
+    // 3. Booking Created — Awaiting Administrator Confirmation
+    if (booking) {
       return (
-        <div className="panel" role="status">
-          <h2>Complete your deposit</h2>
+        <div className="panel animate-fade-in" role="status">
+          <h2>Booking Request #{booking.id} Received! ⏳</h2>
           <p>
-            Booking <strong>#{booking.id}</strong> created. Please complete the deposit of{' '}
-            <strong>₹{booking.depositAmount}</strong> (50% of estimated rental) to hold your costume.
+            Your request for <strong>{booking.sizeSummary || `Size ${booking.size}`}</strong>{' '}
+            ({booking.totalQuantity || 1} piece{(booking.totalQuantity || 1) > 1 ? 's' : ''}) for{' '}
+            <strong>{booking.startDate} to {booking.endDate}</strong> has been submitted.
           </p>
-          {payError && <p className="form-error" role="alert">{payError}</p>}
-          <button className="btn btn-primary" onClick={() => startPayment(booking)}>
-            Pay ₹{booking.depositAmount} deposit
-          </button>
-          <p className="form-hint">If the payment window closed, click above to reopen it.</p>
+          <div className="booking-deadline-pill">
+            <span>📅 Rental Dates: <strong>{booking.startDate} to {booking.endDate}</strong></span>
+            <span>⏰ Return Deadline: <strong>{booking.returnDeadline ? booking.returnDeadline.replace('T', ' at ') : `${booking.endDate} at 8:00 PM`}</strong></span>
+          </div>
+
+          <div className="deposit-action-card" style={{ marginTop: '1rem', background: '#fcf8ee', border: '1px solid var(--gold)', borderRadius: 'var(--radius)', padding: '1rem' }}>
+            <h4 style={{ margin: '0 0 0.35rem', color: 'var(--maroon)' }}>Next Step: Administrator Review &amp; Confirmation</h4>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-on-paper)', lineHeight: 1.5 }}>
+              Our store staff will review your requested dates and inventory. Once confirmed, your 50% deposit (<strong>₹{booking.depositAmount || 0}</strong>) will be unlocked for online payment under <strong>My Account</strong> via Razorpay.
+            </p>
+            <div className="panel-actions" style={{ marginTop: '0.9rem' }}>
+              <Link to="/account" className="btn btn-primary">
+                View Booking in My Account
+              </Link>
+              <a
+                className="btn btn-outline"
+                target="_blank"
+                rel="noreferrer"
+                href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(bookingWaText)}`}
+              >
+                Chat on WhatsApp
+              </a>
+            </div>
+          </div>
         </div>
       );
     }
 
-    // Default: booking form
+    // 4. Default: Multi-Size & Multi-Piece Booking Form
     return (
-      <form className="panel" onSubmit={submit}>
+      <form className="panel booking-form" onSubmit={submit}>
         <h2>Book this costume</h2>
+
+        {/* Date Range Selection */}
         <div className="form-row">
           <label className="field">
-            <span>From</span>
+            <span>Rental Start Date</span>
             <input
-              type="date" min={todayLocal()} value={start}
-              onChange={(e) => { setStart(e.target.value); if (end && e.target.value > end) setEnd(''); }}
+              type="date"
+              min={todayLocal()}
+              value={start}
+              onChange={(e) => {
+                setStart(e.target.value);
+                if (end && e.target.value > end) setEnd('');
+              }}
               required
             />
           </label>
           <label className="field">
-            <span>To</span>
+            <span>Rental End Date</span>
             <input
-              type="date" min={start || todayLocal()} value={end}
+              type="date"
+              min={start || todayLocal()}
+              value={end}
               onChange={(e) => setEnd(e.target.value)}
               required
             />
           </label>
         </div>
 
-        <label className="field">
-          <span>Size (inches)</span>
-          <select value={size} onChange={(e) => setSize(e.target.value)} required>
-            <option value="">Choose a size</option>
-            {sizeOptions.map((s) => {
-              const left = remainingFor(s);
+        {availError && <p className="form-error">{availError}</p>}
+
+        {/* Multi-Size & Quantity Selection Interface */}
+        <div className="size-selector-section">
+          <div className="size-selector-header">
+            <span>Select Sizes &amp; Quantities</span>
+            {!datesReady && <small className="form-hint">Choose dates above to check live stock</small>}
+          </div>
+
+          <div className="size-qty-table" role="region" aria-label="Size and quantity selection">
+            {sizeOptions.map((sz) => {
+              const remaining = datesReady ? remainingFor(sz) : null;
+              const isAvailable = remaining === null || remaining > 0;
+              const qty = sizeQuantities[sz] || 0;
+
               return (
-                <option key={s} value={s} disabled={left === 0}>
-                  {s}{left === 0 ? ' — booked for these dates' : ''}
-                </option>
+                <div
+                  key={sz}
+                  className={`size-qty-row ${qty > 0 ? 'size-qty-row--selected' : ''} ${!isAvailable ? 'size-qty-row--disabled' : ''}`}
+                >
+                  <div className="size-qty-row__label">
+                    <strong>Size {sz}</strong>
+                    {datesReady && (
+                      <span className={`stock-indicator ${remaining > 0 ? 'stock-indicator--in' : 'stock-indicator--out'}`}>
+                        {remaining > 0 ? `${remaining} in stock` : 'Booked'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="size-qty-stepper">
+                    <button
+                      type="button"
+                      className="stepper-btn stepper-btn--minus"
+                      onClick={() => updateQuantity(sz, -1)}
+                      disabled={qty === 0 || !isAvailable}
+                      aria-label={`Decrease quantity for Size ${sz}`}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      max={remaining != null ? remaining : 99}
+                      value={qty}
+                      onChange={(e) => setDirectQuantity(sz, e.target.value)}
+                      disabled={!isAvailable}
+                      className="stepper-input"
+                      aria-label={`Quantity for Size ${sz}`}
+                    />
+                    <button
+                      type="button"
+                      className="stepper-btn stepper-btn--plus"
+                      onClick={() => updateQuantity(sz, 1)}
+                      disabled={!isAvailable || (remaining != null && qty >= remaining)}
+                      aria-label={`Increase quantity for Size ${sz}`}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               );
             })}
-          </select>
-        </label>
-        {costume.pooled && (
-          <p className="form-hint">Tell us your exact measurements in the notes and we will check the fit.</p>
+          </div>
+
+          {costume.pooled && (
+            <p className="form-hint" style={{ marginTop: '0.6rem' }}>
+              💡 This design has pooled sizing from {costume.sizeMin}&quot; to {costume.sizeMax}&quot;. You can request pieces across any size within the range.
+            </p>
+          )}
+        </div>
+
+        {/* Selected Pieces Summary Banner */}
+        {totalPieces > 0 && (
+          <div className="selected-summary-card animate-fade-in">
+            <div className="selected-summary-header">
+              <span>Selected Breakdown:</span>
+              <strong>{totalPieces} piece{totalPieces > 1 ? 's' : ''} total</strong>
+            </div>
+            <div className="selected-chips">
+              {selectedItems.map((item) => (
+                <span key={item.size} className="selected-chip">
+                  Size {item.size} × {item.quantity}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
-        {availError && <p className="form-error">{availError}</p>}
-        {size && datesReady && chosenRemaining !== null && (
-          <p className={chosenRemaining > 0 ? 'avail avail--ok' : 'avail avail--no'} aria-live="polite">
-            {chosenRemaining > 0
-              ? `Good news — size ${size} is free for these dates (${chosenRemaining} left).`
-              : `Size ${size} is already booked for some of these dates.`}
-          </p>
-        )}
-
+        {/* Measurements & Special Notes */}
         <label className="field">
-          <span>Notes (occasion, measurements)</span>
+          <span>Dancer Notes (Ages, heights, specific measurements)</span>
           <textarea
-            rows={3} maxLength={500} value={notes}
+            rows={2}
+            maxLength={500}
+            value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Arangetram on 14th, height 4'8&quot;"
+            placeholder="e.g. 2 dancers for arangetram recital, height 5'1 and 5'3"
           />
         </label>
 
-        {estimate && (
-          <p className="estimate">
-            {days} day{days > 1 ? 's' : ''} × ₹{costume.rentPrice} = <strong>₹{estimate}</strong>{' '}
-            <span>(deposit: ₹{Math.ceil(estimate / 2)} · balance paid on collection)</span>
-          </p>
+        {/* Real-time Pricing Estimate */}
+        {estimate && datesReady && (
+          <div className="estimate-box animate-fade-in">
+            <div className="estimate-row">
+              <span>Costume Rental:</span>
+              <span>{totalPieces} piece{totalPieces > 1 ? 's' : ''} × {days} day{days > 1 ? 's' : ''} × ₹{costume.rentPrice}</span>
+            </div>
+            <div className="estimate-row estimate-row--total">
+              <strong>Total Estimated Rental:</strong>
+              <strong>₹{estimate}</strong>
+            </div>
+            <div className="estimate-row estimate-row--deposit">
+              <span>Deposit payable now (50%):</span>
+              <strong style={{ color: 'var(--gold-dark)' }}>₹{depositAmount}</strong>
+            </div>
+            <div className="estimate-deadline">
+              ⏰ Return Deadline: <strong>{end} by 8:00 PM</strong>
+            </div>
+          </div>
         )}
+
+        {/* Rental Terms and Conditions section */}
+        <div className="terms-container">
+          <div className="terms-header">
+            <h4>📜 Rental Terms &amp; Conditions</h4>
+            <button
+              type="button"
+              className="terms-toggle-btn"
+              onClick={() => setShowTermsDetails(!showTermsDetails)}
+              aria-expanded={showTermsDetails}
+            >
+              {showTermsDetails ? 'Hide details ▲' : 'Read terms ▼'}
+            </button>
+          </div>
+
+          <div className="terms-summary">
+            <ul>
+              <li><strong>Standard rental:</strong> ₹650/day per costume (special saree sets: ₹1,500/order).</li>
+              <li><strong>Return deadline:</strong> 8:00 PM on the scheduled end date.</li>
+              <li><strong>Late penalty:</strong> Flat ₹250 applied if returned past 8:00 PM.</li>
+              <li><strong>Damage assessment:</strong> Inspected by administrator; never automatically deducted.</li>
+            </ul>
+          </div>
+
+          {showTermsDetails && (
+            <div className="terms-full-text animate-fade-in">
+              <p>By checking the box below, you agree to the complete Natya Vastra Rental Policy:</p>
+              <ol>
+                <li>Costumes must be returned in the condition received, allowing for normal stage wear.</li>
+                <li>Any suspected damage will be documented with photos and discussed before any charge is confirmed.</li>
+                <li>Late returns past 8:00 PM incur a ₹250 penalty (total ₹900 for a standard costume).</li>
+                <li>Both customers and store staff can raise formal complaint tickets for dispute resolution.</li>
+              </ol>
+            </div>
+          )}
+
+          <label className="terms-checkbox-label">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              required
+            />
+            <span>I have reviewed and agree to the <strong>Natya Vastra Rental Policy &amp; Terms</strong></span>
+          </label>
+        </div>
+
         {error && <p className="form-error" role="alert">{error}</p>}
 
-        {user ? (
-          <button className="btn btn-primary" disabled={submitting || chosenRemaining === 0}>
-            {submitting ? 'Sending…' : costume.rentPrice ? 'Book & pay deposit' : 'Request booking'}
-          </button>
-        ) : (
-          <Link className="btn btn-primary" to="/login" state={{ from: location }}>Log in to book</Link>
-        )}
-        <p className="form-hint">
-          {costume.rentPrice
-            ? 'A 50% deposit is collected now. The remaining balance is paid when you collect the costume.'
-            : 'Your request holds the costume for you. We confirm every booking personally.'}
-        </p>
+        <button
+          type="submit"
+          className="btn btn-primary btn-block"
+          disabled={submitting || !datesReady || totalPieces === 0}
+        >
+          {submitting ? 'Holding your costumes…' : `Book ${totalPieces > 0 ? `${totalPieces} Piece${totalPieces > 1 ? 's' : ''}` : 'Costume'}`}
+        </button>
       </form>
     );
   };
 
   return (
-    <main className="page">
+    <main className="page costume-detail-page">
       <div className="container">
-        <Link to="/browse" className="link-btn">← All costumes</Link>
-        <div className="detail">
-          <div className="detail__img"><img src={assetUrl(costume.src)} alt={title} /></div>
+        <nav className="breadcrumb" aria-label="Breadcrumb">
+          <Link to="/">Home</Link>
+          <span aria-hidden="true">/</span>
+          <Link to="/browse">Catalog</Link>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{title}</span>
+        </nav>
 
+        <div className="detail">
+          {/* Costume Photograph & Badges */}
+          <div className="detail__img-wrap">
+            <div className="detail__img">
+              <img
+                src={assetUrl(costume.src || costume.imagePath)}
+                alt={title}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '/assets/images/costume-001.jpg';
+                }}
+              />
+              <button
+                type="button"
+                className={`heart ${saved ? 'heart--on' : ''}`}
+                onClick={onHeart}
+                aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
+              >
+                ♥
+              </button>
+            </div>
+            {costume.pooled && (
+              <div className="detail__pooled-tag">
+                <span>Flexible Pooled Sizing</span>
+              </div>
+            )}
+          </div>
+
+          {/* Costume Specifications & Booking Flow */}
           <div className="detail__info">
-            <p className="detail__cat">{costume.categoryName}</p>
+            <span className="detail__cat">{costume.categoryName}</span>
             <h1 className="page-title">{title}</h1>
             <p className="detail__price">
-              {costume.rentPrice ? `₹${costume.rentPrice} per day` : 'Rent price on request'}
+              {costume.rentPrice ? `₹${costume.rentPrice} / day` : 'Price on request'}
             </p>
 
-            {costume.sizeMin && (
+            <div className="detail__desc">
               <p>
-                Available in sizes {costume.sizeMin}–{costume.sizeMax} inches
-                {costume.total ? ` · ${costume.total} pieces in total` : ''}.
+                Authentic classical dance attire crafted for stage performances, recitals, and examinations.
+                Features traditional zari embellishments, pleated fan borders, and reinforced stitching.
               </p>
-            )}
-            {costume.sizes.length > 0 && (
-              <ul className="chips">
-                {costume.sizes.map((s) => (
-                  <li key={s.size}><strong>{s.size}</strong> × {s.count}</li>
-                ))}
-              </ul>
-            )}
+            </div>
 
-            <button className="btn btn-outline detail__heart" onClick={onHeart} aria-pressed={saved}>
-              {saved ? '♥ Saved to wishlist' : '♡ Save to wishlist'}
-            </button>
+            <div className="detail__spec-chips">
+              <span className="spec-chip">
+                📏 {costume.pooled ? `Sizes ${costume.sizeMin}″ to ${costume.sizeMax}″` : `Available sizes: ${sizeOptions.join(', ')}″`}
+              </span>
+              <span className="spec-chip">
+                ✨ Condition: Inspected &amp; Sanitized
+              </span>
+            </div>
 
             {renderPanel()}
           </div>
