@@ -1,80 +1,326 @@
-.navbar {
+/* ==========================================================================
+   NATYA VASTRA — FLOATING NAVIGATION BAR (GLOBAL ACROSS ALL PAGES)
+   ========================================================================== */
+
+.floating-nav-wrapper {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 40;
-  background: transparent;
-  transition: background 0.25s ease, box-shadow 0.25s ease;
+  z-index: 100;
+  padding: 0.65rem clamp(0.8rem, 2.5vw, 1.8rem);
+  pointer-events: none; /* Allows clicks outside the floating island */
+  transition: padding 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.navbar--solid {
-  background: var(--ink);
-  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.18);
+.floating-nav-wrapper--scrolled {
+  padding-top: 0.38rem;
+  padding-bottom: 0.38rem;
 }
 
-.navbar__inner {
+.floating-nav-container {
+  max-width: var(--max-width, 1140px);
+  margin: 0 auto;
+}
+
+.floating-nav {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 1.1rem;
-  padding-bottom: 1.1rem;
+  padding: 0.38rem 1.15rem;
+  background: linear-gradient(135deg, rgba(67, 16, 28, 0.95) 0%, rgba(38, 8, 17, 0.97) 100%);
+  border: 1px solid rgba(216, 174, 90, 0.35);
+  border-radius: 9999px;
+  box-shadow: 0 4px 18px -3px rgba(24, 7, 13, 0.45),
+              0 0 0 1px rgba(216, 174, 90, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.navbar__mark {
-  font-family: var(--font-display);
-  font-size: 1.85rem;
+.floating-nav-wrapper--scrolled .floating-nav {
+  box-shadow: 0 6px 22px -4px rgba(24, 7, 13, 0.65),
+              0 0 0 1px rgba(216, 174, 90, 0.3);
+}
+
+/* ---------- Brand Logo ---------- */
+.floating-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  color: #FFFDF9;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.floating-nav__brand:hover {
+  transform: translateY(-1px);
+}
+
+.floating-nav__brand-symbol {
+  font-size: 1.15rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px rgba(216, 174, 90, 0.5));
+}
+
+.floating-nav__brand-name {
+  font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+  font-size: clamp(1.18rem, 1.6vw, 1.4rem);
   font-weight: 700;
-  color: var(--text-on-ink);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  color: #FFFDF9;
+  background: linear-gradient(135deg, #FFFDF9 30%, #F5D799 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
 }
 
-.navbar__links {
+/* ---------- Links List ---------- */
+.floating-nav__links {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  font-size: 1.02rem;
+  gap: clamp(0.45rem, 1.2vw, 1.1rem);
+}
+
+.floating-nav__link {
+  position: relative;
+  text-decoration: none;
+  color: rgba(243, 233, 216, 0.85);
+  font-size: 0.86rem;
   font-weight: 500;
+  padding: 0.28rem 0.5rem;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
-.navbar__links a {
-  color: rgba(243, 233, 216, 0.88);
-  transition: color 0.15s ease;
-}
-.navbar__links a:hover { color: var(--text-on-ink); }
-
-.navbar__cta {
-  padding: 0.5rem 1.1rem;
-  border: 1px solid var(--gold);
-  border-radius: var(--radius);
-  color: var(--gold-light) !important;
-}
-.navbar__cta:hover {
-  background: var(--gold);
-  color: var(--ink) !important;
+.floating-nav__link:hover {
+  color: #FFFDF9;
 }
 
-@media (max-width: 720px) {
-  .navbar__mark { font-size: 1.5rem; }
-  .navbar__links { gap: 1.1rem; font-size: 0.92rem; }
+.floating-nav__link--active {
+  color: #FFFDF9 !important;
+  font-weight: 600;
 }
 
-.navbar__link-btn {
+.floating-nav__link--active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold-light, #D8AE5A) 50%, transparent 100%);
+  border-radius: 2px;
+}
+
+.floating-nav__sparkle {
+  font-size: 0.78rem;
+  color: var(--gold-light);
+}
+
+/* ---------- Actions & CTAs ---------- */
+.floating-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.floating-nav__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.88rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: rgba(216, 174, 90, 0.16);
+  border: 1px solid rgba(216, 174, 90, 0.55);
+  color: var(--gold-light, #D8AE5A) !important;
+  transition: all 0.2s ease;
+}
+
+.floating-nav__cta:hover,
+.floating-nav__cta--active {
+  background: var(--gold, #B8862E);
+  color: #18070D !important;
+  border-color: var(--gold);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(216, 174, 90, 0.25);
+}
+
+.floating-nav__logout-btn {
   background: none;
   border: none;
-  padding: 0;
-  color: rgba(243, 233, 216, 0.88);
-  font-size: inherit;
+  padding: 0.28rem 0.45rem;
+  color: rgba(243, 233, 216, 0.72);
+  font-size: 0.82rem;
   font-weight: 500;
-}
-.navbar__link-btn:hover { color: var(--text-on-ink); }
-
-@media (max-width: 860px) {
-  .navbar__opt { display: none; }
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s ease;
 }
 
-@media (max-width: 560px) {
-  .navbar__mark { font-size: 1.3rem; }
-  .navbar__links { gap: 0.8rem; font-size: 0.86rem; }
-  .navbar__cta { padding: 0.4rem 0.7rem; }
+.floating-nav__logout-btn:hover {
+  color: #FFF;
+}
+
+/* ---------- Mobile Menu Hamburger ---------- */
+.floating-nav__mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+.hamburger-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #FFFDF9;
+  border-radius: 2px;
+  transition: all 0.25s ease;
+}
+
+.hamburger-bar--open-1 {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.hamburger-bar--open-2 {
+  opacity: 0;
+}
+
+.hamburger-bar--open-3 {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* ---------- Mobile Menu Drawer ---------- */
+.floating-nav__drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(18, 5, 9, 0.75);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 150;
+}
+
+.floating-nav__drawer-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.floating-nav__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(88vw, 360px);
+  background: linear-gradient(180deg, #380814 0%, #20040B 100%);
+  border-left: 1px solid rgba(216, 174, 90, 0.35);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.6);
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow-y: auto;
+}
+
+.floating-nav__drawer--open {
+  transform: translateX(0);
+}
+
+.floating-nav__drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(216, 174, 90, 0.2);
+}
+
+.floating-nav__drawer-close {
+  background: none;
+  border: 1px solid rgba(216, 174, 90, 0.35);
+  color: #FFF;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.floating-nav__drawer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.5rem 0;
+  flex: 1;
+}
+
+.floating-nav__drawer-link {
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  color: rgba(243, 233, 216, 0.9);
+  text-decoration: none;
+  font-size: 1.08rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.floating-nav__drawer-link:hover,
+.floating-nav__drawer-link--active {
+  background: rgba(216, 174, 90, 0.15);
+  color: #FFFDF9;
+  border-left: 3px solid var(--gold);
+}
+
+.floating-nav__drawer-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(216, 174, 90, 0.2);
+}
+
+.floating-nav__drawer-cta {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+/* ---------- Responsive Breakpoints ---------- */
+@media (max-width: 920px) {
+  .floating-nav__links,
+  .floating-nav__actions {
+    display: none;
+  }
+  .floating-nav__mobile-toggle {
+    display: flex;
+  }
+  .floating-nav {
+    padding: 0.55rem 1.1rem;
+  }
 }
