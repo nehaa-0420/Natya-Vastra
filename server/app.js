@@ -27,6 +27,8 @@ app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/assistant', require('./routes/assistant'));
+app.use('/api/complaints', require('./routes/complaints'));
+app.use('/api/damage-reports', require('./routes/damageReports'));
 app.use('/api/admin', require('./routes/admin'));
 
 app.use((req, res) => res.status(404).json({ error: 'Not found.' }));
@@ -35,7 +37,7 @@ app.use((req, res) => res.status(404).json({ error: 'Not found.' }));
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Request body was not valid JSON.' });
   if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'That photo is too large (max 5 MB).' });
-  if (err.message && /Only JPG/.test(err.message)) return res.status(400).json({ error: err.message });
+  if (err.message && (/Only JPG/.test(err.message) || /allowed/.test(err.message))) return res.status(400).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: 'Something went wrong on our end.' });
 });

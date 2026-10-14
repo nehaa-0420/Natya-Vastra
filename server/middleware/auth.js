@@ -37,4 +37,4 @@ function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { signToken, publicUser, requireAuth, requireAdmin };
+module.exports = { signToken, publicUser, requireAuth, requireAdmin, readUser };

@@ -72,3 +72,31 @@ export const failPayment = (orderId) => request(`/api/payments/${orderId}/fail`,
 
 // AI costume assistant
 export const askAssistant = (messages) => request('/api/assistant', { method: 'POST', body: { messages } });
+
+// complaints (customer)
+export const submitComplaint = (form) => request('/api/complaints', { method: 'POST', form });
+export const getMyComplaints = () => request('/api/complaints/mine');
+export const getComplaint = (id) => request(`/api/complaints/${id}`);
+
+// damage reports (customer)
+export const getMyDamageReports = () => request('/api/damage-reports/mine');
+export const getDamageReport = (id) => request(`/api/damage-reports/${id}`);
+export const respondDamageReport = (id, response) => request(`/api/damage-reports/${id}/respond`, { method: 'POST', body: { response } });
+
+// admin inspections & damage reports
+export const adminGetInspections = () => request('/api/admin/inspections');
+export const adminGetBookingInspection = (bookingId) => request(`/api/admin/inspections/booking/${bookingId}`);
+export const adminSaveInspection = (body) => request('/api/admin/inspections', { method: 'POST', body });
+export const adminSubmitDamageReport = (inspectionId, body) => request(`/api/admin/inspections/${inspectionId}/damage-report`, { method: 'POST', body });
+export const adminCorrectPenalty = (inspectionId, body) => request(`/api/admin/inspections/${inspectionId}/correct-penalty`, { method: 'POST', body });
+export const adminGetDamageReports = () => request('/api/admin/damage-reports');
+export const adminRetryDamageReportEmail = (id) => request(`/api/admin/damage-reports/${id}/retry-email`, { method: 'POST' });
+export const adminUploadEvidence = (form) => request('/api/admin/upload-evidence', { method: 'POST', form });
+
+// admin complaints
+export const adminGetComplaints = (params = {}) => request(`/api/admin/complaints${qs(params)}`);
+export const adminGetComplaint = (id) => request(`/api/admin/complaints/${id}`);
+export const adminAddComplaintNote = (id, note) => request(`/api/admin/complaints/${id}/notes`, { method: 'POST', body: { note } });
+export const adminUpdateComplaint = (id, body) => request(`/api/admin/complaints/${id}`, { method: 'PATCH', body });
+export const adminRetryComplaintEmail = (id) => request(`/api/admin/complaints/${id}/retry-email`, { method: 'POST' });
+export const adminGetAuditLogs = () => request('/api/admin/audit-logs');
