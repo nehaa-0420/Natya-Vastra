@@ -20,16 +20,18 @@ function getRazorpay() {
   const Razorpay = require('razorpay');
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keyId || !keySecret) throw new Error('Razorpay keys are not configured.');
+  if (!keyId || !keySecret || keySecret.includes('*')) {
+    throw new Error('Razorpay keys are not configured or contain placeholder asterisks.');
+  }
   _rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
   return _rzp;
 }
 
 // ── Helper: deposit amount in rupees ─────────────────────────────────────
-// 50% of (rent_price × days), rounded up to the nearest rupee.
-function depositRupees(rentPrice, startDate, endDate) {
+// 50% of (rent_price × days × totalQuantity), rounded up to the nearest rupee.
+function depositRupees(rentPrice, startDate, endDate, totalQuantity = 1) {
   const days = Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
-  return Math.ceil((rentPrice * days) / 2);
+  return Math.ceil(((rentPrice * totalQuantity) * days) / 2);
 }
 
 // ── POST /api/payments/orders ─────────────────────────────────────────────
@@ -47,20 +49,40 @@ router.post('/orders', requireAuth, (req, res) => {
   if (booking.status === 'cancelled') {
     return res.status(400).json({ error: 'Cannot pay for a cancelled booking.' });
   }
+  if (booking.status !== 'confirmed') {
+    return res.status(400).json({ error: 'Payment is only available once your booking has been confirmed by the store administrator.' });
+  }
   if (booking.deposit_status === 'paid') {
     return res.status(400).json({ error: 'Deposit already paid.' });
   }
   if (!booking.rent_price) {
-    // No rent_price set → should not reach here, but guard anyway.
     return res.status(400).json({ error: 'This costume has no online price. Please contact us on WhatsApp.' });
   }
 
-  const amountRupees = depositRupees(booking.rent_price, booking.start_date, booking.end_date);
+  let totalQty = booking.total_quantity || 1;
+  try {
+    const itemRow = db.prepare('SELECT SUM(quantity) AS sum FROM booking_items WHERE booking_id = ?').get(bookingId);
+    if (itemRow?.sum) totalQty = itemRow.sum;
+  } catch { /* fallback */ }
+
+  const days = Math.max(1, Math.round((new Date(booking.end_date) - new Date(booking.start_date)) / 86400000) + 1);
+  const baseRental = booking.rental_price != null ? booking.rental_price : (booking.rent_price * totalQty * days);
+  const amountRupees = Math.ceil(baseRental / 2);
   const amountPaise = amountRupees * 100;
 
+  if (amountRupees <= 0) {
+    return res.status(400).json({ error: 'This booking has no payable deposit amount.' });
+  }
+
   let rzp;
-  try { rzp = getRazorpay(); } catch (e) {
-    return res.status(503).json({ error: 'Online payment is not configured. Please contact us on WhatsApp.' });
+  try {
+    rzp = getRazorpay();
+  } catch (e) {
+    return res.status(503).json({
+      error: 'Razorpay payment gateway is not configured with active test credentials. ' +
+             'Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in server/.env, ' +
+             'or contact Natya Vastra on WhatsApp.'
+    });
   }
 
   rzp.orders.create({
@@ -92,6 +114,11 @@ router.post('/orders', requireAuth, (req, res) => {
     });
   }).catch((err) => {
     console.error('Razorpay order creation failed:', err);
+    if (err.statusCode === 401 || err.error?.code === 'BAD_REQUEST_ERROR') {
+      return res.status(502).json({
+        error: 'Razorpay authentication failed: Test credentials in server/.env are invalid or unverified. Please configure valid RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.'
+      });
+    }
     res.status(502).json({ error: 'Could not create payment. Please try again or contact us.' });
   });
 });

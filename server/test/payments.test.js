@@ -72,6 +72,8 @@ test.before(async () => {
     body: JSON.stringify({ costumeId: priceOnRequestCostumeId, size: 36, startDate: inDays(15), endDate: inDays(16) })
   });
   priceOnRequestBookingId = (await bRes2.json()).id;
+  // Confirm the bookings so payment is unlocked (per workflow requirement)
+  db.prepare("UPDATE bookings SET status = 'confirmed' WHERE id IN (?, ?)").run(bookingId, priceOnRequestBookingId);
 });
 
 test.after(() => server.close());
@@ -95,6 +97,18 @@ function makeSignature(orderId, paymentId) {
 test('creating a payment order requires auth', async () => {
   const r = await call('POST', '/api/payments/orders', { body: { bookingId } });
   assert.equal(r.status, 401);
+});
+
+test('cannot create a payment order for an unconfirmed (pending) booking', async () => {
+  const bRes = await fetch(`${base}/api/bookings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ costumeId, size: 34, startDate: inDays(30), endDate: inDays(31) })
+  });
+  const unconfirmedId = (await bRes.json()).id;
+  const r = await call('POST', '/api/payments/orders', { body: { bookingId: unconfirmedId }, tok: token });
+  assert.equal(r.status, 400);
+  assert.ok(r.json.error.includes('confirmed'));
 });
 
 test('creates a Razorpay order and returns client details', async () => {
@@ -143,6 +157,7 @@ test('verifying a tampered signature is rejected', async () => {
     body: JSON.stringify({ costumeId, size: 34, startDate: inDays(20), endDate: inDays(21) })
   });
   const bid2 = (await bRes.json()).id;
+  db.prepare("UPDATE bookings SET status = 'confirmed' WHERE id = ?").run(bid2);
   await call('POST', '/api/payments/orders', { body: { bookingId: bid2 }, tok: token });
 
   const r = await call('POST', '/api/payments/verify', {
@@ -161,6 +176,7 @@ test('marking payment failed updates booking deposit_status', async () => {
     body: JSON.stringify({ costumeId, size: 34, startDate: inDays(25), endDate: inDays(26) })
   });
   const bid3 = (await bRes.json()).id;
+  db.prepare("UPDATE bookings SET status = 'confirmed' WHERE id = ?").run(bid3);
   await call('POST', '/api/payments/orders', { body: { bookingId: bid3 }, tok: token });
 
   const r = await call('POST', '/api/payments/order_FAIL/fail', { tok: token });
