@@ -3,9 +3,13 @@ const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 const { DB_PATH } = require('../lib/config');
 
-// Ensure database directory exists before mounting (e.g. on /var/data persistent disk)
+// Ensure database directory exists before mounting
 if (DB_PATH !== ':memory:') {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  try {
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  } catch {
+    // Handled in config.js
+  }
 }
 
 const db = new DatabaseSync(DB_PATH);
