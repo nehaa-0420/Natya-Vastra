@@ -5,12 +5,14 @@ services:
     rootDir: server
     plan: starter
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node --experimental-sqlite server.js
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 22.12.0
+      - key: NODE_OPTIONS
+        value: --experimental-sqlite
       - key: NODE_ENV
         value: production
       - key: PORT

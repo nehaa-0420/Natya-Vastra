@@ -122,6 +122,7 @@ UPLOAD_DIR=/var/data/uploads
      - Size: `1 GB`
    - **Environment Variables:**
      - `NODE_VERSION`: `22.12.0` (required for built-in `node:sqlite`)
+     - `NODE_OPTIONS`: `--experimental-sqlite` (enables experimental SQLite module on Node 22)
      - `NODE_ENV`: `production`
      - `PORT`: `10000`
      - `HOST`: `0.0.0.0`
